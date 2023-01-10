@@ -10,6 +10,7 @@ import SWAGCommands from "..";
 import getAllFiles from "../util/get-all-files";
 import Command from "./Command";
 import SlashCommands from "./SlashCommands";
+import { cooldownTypes, cooldownTypesType } from "../util/Cooldowns";
 
 class CommandHandler {
 	// <commandName, commandObject>
@@ -113,22 +114,49 @@ class CommandHandler {
 		message: Message,
 		interaction: Interaction
 	) {
-		const { callback, type } = command.commandObject;
+		const { callback, type, cooldowns } = command.commandObject;
 
 		if (message && type === "SLASH") return;
+
+		const guild = message ? message.guild : interaction.guild;
+		const member = message ? message.member : interaction.member;
+		const user = message ? message.author : interaction.user;
 
 		const usage = {
 			message,
 			interaction,
 			args,
 			text: args.join(" "),
-			guild: message ? message.guild : interaction.guild,
-			member: message ? message.member : interaction.member,
-			user: message ? message.author : interaction.user,
+			guild,
+			member,
+			user,
 		};
 
 		for (const validation of this._validations) {
 			if (!validation.validation(command, usage, this._prefix)) return;
+		}
+
+		if (cooldowns) {
+			let cooldownType: cooldownTypesType = "global";
+			for (const type of cooldownTypes) {
+				if (cooldowns[type]) {
+					cooldownType = type as cooldownTypesType;
+					break;
+				}
+			}
+			const cooldownUsage = {
+				cooldownType,
+				userId: user.id,
+				actionId: `command_${command.commandName}`,
+				guildId: guild?.id,
+				duration: cooldowns[cooldownType],
+				errorMessage: cooldowns.errorMessage,
+			};
+
+			const result = this._instance.cooldowns.canRunAction(cooldownUsage);
+			if (typeof result === "string") return result;
+
+			this._instance.cooldowns.start(cooldownUsage);
 		}
 
 		return await callback(usage);

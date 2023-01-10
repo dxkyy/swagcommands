@@ -1,10 +1,12 @@
 import CommandHandler from "./command-handler/CommandHandler";
 import mongoose from "mongoose";
 import { ISWAGCommands } from "./types";
+import Cooldowns from "./util/Cooldowns";
 
 class SWAGCommands {
 	_testServers;
 	_botOwners;
+	_cooldowns;
 	constructor({
 		client,
 		commandsDir,
@@ -12,6 +14,7 @@ class SWAGCommands {
 		mongoUri,
 		testServers = [],
 		botOwners = [],
+		cooldownConfig,
 	}: ISWAGCommands) {
 		if (!client) {
 			throw new Error("A client is required.");
@@ -19,6 +22,12 @@ class SWAGCommands {
 
 		this._testServers = testServers;
 		this._botOwners = botOwners;
+		this._cooldowns = new Cooldowns((this as unknown) as SWAGCommands, {
+			errorMessage: "Please wait {TIME} before using this command again.",
+			botOwnersBypass: false,
+			dbRequired: 300, // 5 minutes
+			...cooldownConfig,
+		});
 
 		if (mongoUri) {
 			this.connectToMongo(mongoUri);
@@ -35,6 +44,10 @@ class SWAGCommands {
 
 	get botOwners() {
 		return this._botOwners;
+	}
+
+	get cooldowns() {
+		return this._cooldowns;
 	}
 
 	connectToMongo(mongoUri: string) {
