@@ -130,7 +130,7 @@ class CommandHandler {
 			guild,
 			member,
 			user,
-		};
+		} as any;
 
 		for (const validation of this._validations) {
 			if (!validation.validation(command, usage, this._prefix)) return;
@@ -156,7 +156,15 @@ class CommandHandler {
 			const result = this._instance.cooldowns.canRunAction(cooldownUsage);
 			if (typeof result === "string") return result;
 
-			this._instance.cooldowns.start(cooldownUsage);
+			await this._instance.cooldowns.start(cooldownUsage);
+
+			usage.cancelCooldown = () => {
+				this._instance.cooldowns.cancelCooldown(cooldownUsage);
+			};
+
+			usage.updateCooldown = (expires: Date) => {
+				this._instance.cooldowns.updateCooldown(cooldownUsage, expires);
+			};
 		}
 
 		return await callback(usage);

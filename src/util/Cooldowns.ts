@@ -67,6 +67,37 @@ class Cooldowns {
 		}
 	}
 
+	getKeyFromCooldownUsage(cooldownUsage: InternalCooldownConfig) {
+		const { cooldownType, userId, guildId, actionId } = cooldownUsage;
+
+		return this.getKey(cooldownType, userId, actionId, guildId!);
+	}
+
+	async cancelCooldown(cooldownUsage: InternalCooldownConfig) {
+		const key = this.getKeyFromCooldownUsage(cooldownUsage);
+
+		this._cooldowns.delete(key);
+
+		await cooldownSchema.deleteOne({ _id: key });
+	}
+
+	async updateCooldown(cooldownUsage: InternalCooldownConfig, expires: Date) {
+		const key = this.getKeyFromCooldownUsage(cooldownUsage);
+
+		this._cooldowns.set(key, expires);
+
+		const now = new Date();
+		const secondsDiff = (expires.getTime() - now.getTime()) / 1000;
+
+		if (secondsDiff > this._dbRequired) {
+			await cooldownSchema.findOneAndUpdate(
+				{ _id: key },
+				{ _id: key, expires },
+				{ upsert: true }
+			);
+		}
+	}
+
 	verifyCooldown(duration: number | string) {
 		if (typeof duration === "number") return duration;
 
