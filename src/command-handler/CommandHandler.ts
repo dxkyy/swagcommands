@@ -4,6 +4,9 @@ import {
 	Message,
 	InteractionType,
 	Interaction,
+	CommandInteraction,
+	CacheType,
+	AutocompleteInteraction,
 } from "discord.js";
 import path from "path";
 import SWAGCommands from "..";
@@ -204,6 +207,11 @@ class CommandHandler {
 
 	async interactionListener(client: Client) {
 		client.on("interactionCreate", async (interaction) => {
+			if (interaction.type === InteractionType.ApplicationCommandAutocomplete) {
+				await this.handleAutocomplete(interaction);
+				return;
+			}
+
 			if (interaction.type !== InteractionType.ApplicationCommand) return;
 
 			const args = interaction.options.data.map(({ value }) => {
@@ -224,6 +232,34 @@ class CommandHandler {
 			if (deferReply) interaction.editReply(response).catch(() => {});
 			else interaction.reply(response).catch(() => {});
 		});
+	}
+
+	async handleAutocomplete(interaction: AutocompleteInteraction) {
+		const command = this._commands.get(interaction.commandName) as Command;
+		if (!command) return;
+
+		const { autocomplete } = command.commandObject;
+		if (!autocomplete) return;
+
+		const focusedOption = interaction.options.getFocused(true);
+		const choices = await autocomplete(
+			interaction,
+			command,
+			focusedOption.name
+		);
+
+		const filtered = choices
+			.filter((choice: string) =>
+				choice.toLowerCase().startsWith(focusedOption.value.toLowerCase())
+			)
+			.slice(0, 25);
+
+		await interaction.respond(
+			filtered.map((choice: string) => ({
+				name: choice,
+				value: choice,
+			}))
+		);
 	}
 
 	getValidations(folder: string) {
