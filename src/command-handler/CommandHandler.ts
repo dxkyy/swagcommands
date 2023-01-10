@@ -20,6 +20,7 @@ class CommandHandler {
 	_commandsDir;
 	_slashCommands;
 	_prefix;
+	_client;
 
 	constructor(
 		instance: SWAGCommands,
@@ -31,12 +32,13 @@ class CommandHandler {
 		this._commandsDir = commandsDir;
 		this._slashCommands = new SlashCommands(client);
 		this._prefix = prefix;
+		this._client = client;
 		this.readFiles();
 		this.messageListener(client);
 		this.interactionListener(client);
 	}
 
-	readFiles() {
+	async readFiles() {
 		const files = getAllFiles(this._commandsDir);
 		const validations = this.getValidations("syntax");
 
@@ -56,6 +58,7 @@ class CommandHandler {
 				type,
 				delete: del,
 				aliases = [],
+				init = () => {},
 			} = commandObject;
 
 			if (del) {
@@ -74,6 +77,8 @@ class CommandHandler {
 			for (const validation of validations) {
 				validation.validation(command);
 			}
+
+			await init(this._client, this._instance);
 
 			const names = [command.commandName, ...aliases];
 
