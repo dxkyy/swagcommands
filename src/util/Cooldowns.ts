@@ -1,5 +1,6 @@
 import SWAGCommands from "..";
 import { CooldownConfig, InternalCooldownConfig } from "../types";
+import cooldownSchema from "../models/cooldown-schema";
 
 const cooldownDurations: any = {
 	s: 1,
@@ -45,9 +46,25 @@ class Cooldowns {
 		this._instance = instance;
 		this._errorMessage =
 			cooldownConfig.errorMessage ||
-			"Please wait {TIME} before using this command again.";
+			"Please wait {TIME} before doing that again.";
 		this._botOwnersBypass = cooldownConfig.botOwnersBypass;
 		this._dbRequired = cooldownConfig.dbRequired;
+
+		this.loadCooldowns();
+	}
+
+	async loadCooldowns() {
+		await cooldownSchema.deleteMany({
+			expires: { $lt: Date.now() },
+		});
+
+		const results = await cooldownSchema.find({});
+
+		for (const result of results) {
+			const { _id, expires } = result;
+
+			this._cooldowns.set(_id, expires);
+		}
 	}
 
 	verifyCooldown(duration: number | string) {
@@ -102,7 +119,7 @@ class Cooldowns {
 		return this._botOwnersBypass && this._instance.botOwners.includes(userId);
 	}
 
-	start({
+	async start({
 		cooldownType,
 		userId,
 		actionId,
@@ -117,13 +134,21 @@ class Cooldowns {
 			);
 
 		const seconds = this.verifyCooldown(duration!);
-		if (seconds >= this._dbRequired) {
-			// TODO: Store this cooldown in the database
-		}
 
 		const key = this.getKey(cooldownType, userId, actionId, guildId);
 		const expires = new Date();
 		expires.setSeconds(expires.getSeconds() + seconds);
+
+		if (seconds >= this._dbRequired) {
+			await cooldownSchema.findOneAndUpdate(
+				{ _id: key },
+				{
+					_id: key,
+					expires,
+				},
+				{ upsert: true }
+			);
+		}
 
 		this._cooldowns.set(key, expires);
 

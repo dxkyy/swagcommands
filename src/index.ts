@@ -23,7 +23,7 @@ class SWAGCommands {
 		this._testServers = testServers;
 		this._botOwners = botOwners;
 		this._cooldowns = new Cooldowns((this as unknown) as SWAGCommands, {
-			errorMessage: "Please wait {TIME} before using this command again.",
+			errorMessage: "Please wait {TIME} before doing that again.",
 			botOwnersBypass: false,
 			dbRequired: 300, // 5 minutes
 			...cooldownConfig,
