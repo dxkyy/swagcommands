@@ -10,6 +10,7 @@ class SWAGCommands {
 	_botOwners;
 	_cooldowns;
 	_logger = logger;
+	_commandHandler;
 	constructor({
 		client,
 		commandsDir,
@@ -37,7 +38,12 @@ class SWAGCommands {
 		}
 
 		if (commandsDir) {
-			new CommandHandler(this, commandsDir, client, prefix);
+			this._commandHandler = new CommandHandler(
+				this,
+				commandsDir,
+				client,
+				prefix
+			);
 		}
 	}
 
@@ -55,6 +61,10 @@ class SWAGCommands {
 
 	get cooldowns() {
 		return this._cooldowns;
+	}
+
+	get commandHandler() {
+		return this._commandHandler;
 	}
 
 	connectToMongo(mongoUri: string) {

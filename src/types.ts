@@ -1,4 +1,12 @@
-import { Client } from "discord.js";
+import {
+	ApplicationCommand,
+	Client,
+	Guild,
+	GuildMember,
+	Message,
+	User,
+} from "discord.js";
+import SWAGCommands from ".";
 
 export interface ISWAGCommands {
 	client: Client;
@@ -23,4 +31,15 @@ export interface InternalCooldownConfig {
 	guildId?: string;
 	duration?: string;
 	errorMessage?: string;
+}
+
+export interface ICallback {
+	instance: SWAGCommands;
+	message: Message;
+	args: string[];
+	text: string;
+	guild: Guild;
+	member: GuildMember;
+	user: User;
+	interaction: ApplicationCommand;
 }

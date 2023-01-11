@@ -42,11 +42,16 @@ class CommandHandler {
 		this.interactionListener(client);
 	}
 
+	get commands() {
+		return this._commands;
+	}
+
 	async readFiles() {
 		const files = getAllFiles(this._commandsDir);
+		const defaultCommands = getAllFiles(path.join(__dirname, "./commands"));
 		const validations = this.getValidations("syntax");
 
-		for (const file of files) {
+		for (const file of [...files, ...defaultCommands]) {
 			const commandObject = require(file).command;
 
 			let commandName = file
@@ -126,6 +131,7 @@ class CommandHandler {
 		const user = message ? message.author : interaction.user;
 
 		const usage = {
+			instance: command.instance,
 			message,
 			interaction,
 			args,
@@ -136,7 +142,7 @@ class CommandHandler {
 		} as any;
 
 		for (const validation of this._validations) {
-			if (!validation.validation(command, usage, this._prefix)) return;
+			if (!(await validation.validation(command, usage, this._prefix))) return;
 		}
 
 		if (cooldowns) {

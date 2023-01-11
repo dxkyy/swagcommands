@@ -1,30 +1,49 @@
 import Command from "../../Command";
 import {
 	CommandInteraction,
+	Guild,
 	GuildMember,
 	Message,
 	PermissionFlagsBits,
 } from "discord.js";
+import requiredPermissionsSchema from "../../../models/required-permissions-schema";
 
 const keys = Object.keys(PermissionFlagsBits);
 
-export const validation = (command: Command, usage: any, prefix: string) => {
+export const validation = async (
+	command: Command,
+	usage: any,
+	prefix: string
+) => {
 	const { permissions = [] } = command.commandObject;
-	const { member, message, interaction } = usage as {
+	const { member, message, interaction, guild } = usage as {
 		member: GuildMember;
 		message: Message;
 		interaction: CommandInteraction;
+		guild: Guild;
 	};
 
-	if (member && permissions.length) {
+	if (!member) return true;
+
+	const document = await requiredPermissionsSchema.findById(
+		`${guild.id}-${command.commandName}`
+	);
+	if (document) {
+		for (const permission of document.permissions) {
+			if (!permissions.includes(permission)) permissions.push(permission);
+		}
+	}
+
+	if (permissions.length) {
 		const missingPermissions = [];
 
 		for (const permission of permissions) {
 			if (!member.permissions.has(permission)) {
 				const permissionName = keys.find(
 					(key) =>
+						key === permission ||
 						PermissionFlagsBits[key as keyof typeof PermissionFlagsBits] ===
-						permission
+							permission
 				);
 				missingPermissions.push(permissionName);
 			}
