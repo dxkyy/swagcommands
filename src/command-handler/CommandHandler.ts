@@ -15,6 +15,7 @@ import Command from "./Command";
 import SlashCommands from "./SlashCommands";
 import { cooldownTypes, cooldownTypesType } from "../util/Cooldowns";
 import ChannelCommands from "./ChannelCommands";
+import CustomCommands from "./CustomCommands";
 
 class CommandHandler {
 	// <commandName, commandObject>
@@ -27,6 +28,7 @@ class CommandHandler {
 	_prefix;
 	_client;
 	_channelCommands = new ChannelCommands();
+	_customCommands = new CustomCommands(this);
 
 	constructor(
 		instance: SWAGCommands,
@@ -50,6 +52,14 @@ class CommandHandler {
 
 	get channelCommands() {
 		return this._channelCommands;
+	}
+
+	get slashCommands() {
+		return this._slashCommands;
+	}
+
+	get customCommands() {
+		return this._customCommands;
 	}
 
 	async readFiles() {
@@ -205,7 +215,10 @@ class CommandHandler {
 				.toLowerCase();
 
 			const command = this._commands.get(commandName) as Command;
-			if (!command) return;
+			if (!command) {
+				this._customCommands.run(commandName!, message);
+				return;
+			}
 
 			const { reply, deferReply } = command.commandObject;
 
@@ -238,7 +251,11 @@ class CommandHandler {
 			});
 
 			const command = this._commands.get(interaction.commandName) as Command;
-			if (!command) return;
+			if (!command) {
+				this._customCommands.run(interaction.commandName!, null, interaction);
+
+				return;
+			}
 
 			const { deferReply } = command.commandObject;
 

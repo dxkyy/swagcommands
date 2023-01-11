@@ -38,7 +38,6 @@ class ChannelCommands {
 		let channels = this._channelCommands.get(_id);
 
 		if (!channels) {
-			console.log("Getting channels from database");
 			const results = await channelCommandsSchema.findById(_id);
 			channels = results ? results.channels : [];
 			this._channelCommands.set(_id, channels);
