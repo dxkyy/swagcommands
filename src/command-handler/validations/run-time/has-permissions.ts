@@ -50,7 +50,7 @@ export const validation = async (
 		}
 
 		if (missingPermissions.length) {
-			const text = `You are missing the following permissions to do this: ${missingPermissions.join(
+			const text = `You are missing the following permissions to perform this action: ${missingPermissions.join(
 				", "
 			)}`;
 
