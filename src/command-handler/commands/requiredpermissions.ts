@@ -59,13 +59,13 @@ export const command = {
 					? document.permissions.join(", ")
 					: "None.";
 
-			return `Here are the permissions for "${commandName}": ${permissions}`;
+			return `The command "${commandName}" requires the following permission(s): ${permissions}.`;
 		}
 
 		if (permission === clearAllPermission) {
 			await requiredPermissionsSchema.deleteOne({ _id });
 
-			return `The Command "${commandName}" no longer requires any permissions.`;
+			return `The command "${commandName}" no longer requires any permissions.`;
 		}
 
 		const alreadyExists = await requiredPermissionsSchema.findOne({
@@ -81,7 +81,7 @@ export const command = {
 				{ _id, $pull: { permissions: permission } }
 			);
 
-			return `The command "${commandName}" no longer requires the permission "${permission}".`;
+			return `The command "${commandName}" no longer requires the permission "${permission}" to be executed.`;
 		}
 
 		await requiredPermissionsSchema.findOneAndUpdate(
@@ -90,6 +90,6 @@ export const command = {
 			{ upsert: true }
 		);
 
-		return `The command "${commandName}" now requires ${permission}.`;
+		return `The command "${commandName}" now requires the permission ${permission} to be executed.`;
 	},
 };

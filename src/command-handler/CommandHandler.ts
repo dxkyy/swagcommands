@@ -14,6 +14,7 @@ import getAllFiles from "../util/get-all-files";
 import Command from "./Command";
 import SlashCommands from "./SlashCommands";
 import { cooldownTypes, cooldownTypesType } from "../util/Cooldowns";
+import ChannelCommands from "./ChannelCommands";
 
 class CommandHandler {
 	// <commandName, commandObject>
@@ -25,6 +26,7 @@ class CommandHandler {
 	_slashCommands;
 	_prefix;
 	_client;
+	_channelCommands = new ChannelCommands();
 
 	constructor(
 		instance: SWAGCommands,
@@ -44,6 +46,10 @@ class CommandHandler {
 
 	get commands() {
 		return this._commands;
+	}
+
+	get channelCommands() {
+		return this._channelCommands;
 	}
 
 	async readFiles() {
@@ -134,6 +140,7 @@ class CommandHandler {
 		const guild = message ? message.guild : interaction.guild;
 		const member = message ? message.member : interaction.member;
 		const user = message ? message.author : interaction.user;
+		const channel = message ? message.channel : interaction.channel;
 
 		const usage = {
 			instance: command.instance,
@@ -144,6 +151,7 @@ class CommandHandler {
 			guild,
 			member,
 			user,
+			channel,
 		} as any;
 
 		for (const validation of this._validations) {

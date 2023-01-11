@@ -53,7 +53,7 @@ export const command = {
 					: "None.";
 
 			return {
-				content: `Here are the roles for "${commandName}": ${roles}`,
+				content: `The required roles for "${commandName}" are ${roles}`,
 				allowedMentions: {
 					roles: [],
 				},

@@ -1,6 +1,6 @@
 import {
-	ApplicationCommand,
 	Client,
+	CommandInteraction,
 	Guild,
 	GuildMember,
 	Message,
@@ -42,5 +42,5 @@ export interface ICallback {
 	guild: Guild;
 	member: GuildMember;
 	user: User;
-	interaction: ApplicationCommand;
+	interaction: CommandInteraction;
 }
