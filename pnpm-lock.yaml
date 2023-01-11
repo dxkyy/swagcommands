@@ -1,10 +1,12 @@
 lockfileVersion: 5.4
 
 specifiers:
+  colorette: ^2.0.19
   discord.js: ^14.7.1
   mongoose: ^6.8.3
 
 dependencies:
+  colorette: 2.0.19
   discord.js: 14.7.1
   mongoose: 6.8.3
 
@@ -934,6 +936,10 @@ packages:
     engines: {node: '>=10.16.0'}
     dependencies:
       streamsearch: 1.1.0
+    dev: false
+
+  /colorette/2.0.19:
+    resolution: {integrity: sha512-3tlv/dIP7FWvj3BsbHrGLJ6l/oKh1O3TcgBqMn+yyCagOxc23fyzDS6HypQbgxWbkpDnf52p1LuR4eWDQ/K9WQ==}
     dev: false
 
   /debug/4.3.4:

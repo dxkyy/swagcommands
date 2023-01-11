@@ -3,12 +3,15 @@ import {
 	ApplicationCommandOptionType,
 	Client,
 } from "discord.js";
+import { Logger } from "../lib/structures/Logger";
 import Command from "./Command";
 
 class SlashCommands {
 	_client;
+	_logger;
 	constructor(client: Client) {
 		this._client = client;
+		this._logger = new Logger();
 	}
 
 	async getCommands(guildId?: string) {
@@ -70,7 +73,7 @@ class SlashCommands {
 				options.length !== existingOptions.length ||
 				this.areOptionsDifferent(options, existingOptions)
 			) {
-				console.log(`Updating the command "${name}"`);
+				this._logger.info(`Updating the command "${name}"`);
 
 				await commands.edit(existingCommand.id, {
 					description,

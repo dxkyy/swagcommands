@@ -2,11 +2,14 @@ import CommandHandler from "./command-handler/CommandHandler";
 import mongoose from "mongoose";
 import { ISWAGCommands } from "./types";
 import Cooldowns from "./util/Cooldowns";
+import { Logger } from "./lib/structures/Logger";
+export const logger = new Logger();
 
 class SWAGCommands {
 	_testServers;
 	_botOwners;
 	_cooldowns;
+	_logger = logger;
 	constructor({
 		client,
 		commandsDir,
@@ -40,6 +43,10 @@ class SWAGCommands {
 
 	get testServers() {
 		return this._testServers;
+	}
+
+	get logger() {
+		return this._logger;
 	}
 
 	get botOwners() {
