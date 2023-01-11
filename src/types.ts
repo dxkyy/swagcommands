@@ -16,6 +16,7 @@ export interface ISWAGCommands {
 	testServers?: string[];
 	botOwners?: string[];
 	cooldownConfig?: CooldownConfig;
+	disabledDefaultCommands?: string[];
 }
 
 export interface CooldownConfig {

@@ -11,6 +11,7 @@ class SWAGCommands {
 	_cooldowns;
 	_logger = logger;
 	_commandHandler;
+	_disabledDefaultCommands;
 	constructor({
 		client,
 		commandsDir,
@@ -19,6 +20,7 @@ class SWAGCommands {
 		testServers = [],
 		botOwners = [],
 		cooldownConfig,
+		disabledDefaultCommands = [],
 	}: ISWAGCommands) {
 		if (!client) {
 			throw new Error("A client is required.");
@@ -32,6 +34,9 @@ class SWAGCommands {
 			dbRequired: 300, // 5 minutes
 			...cooldownConfig,
 		});
+		this._disabledDefaultCommands = disabledDefaultCommands.map((cmd) =>
+			cmd.toLowerCase()
+		);
 
 		if (mongoUri) {
 			this.connectToMongo(mongoUri);
@@ -61,6 +66,10 @@ class SWAGCommands {
 
 	get cooldowns() {
 		return this._cooldowns;
+	}
+
+	get disabledDefaultCommands() {
+		return this._disabledDefaultCommands;
 	}
 
 	get commandHandler() {

@@ -70,7 +70,12 @@ class CommandHandler {
 				init = () => {},
 			} = commandObject;
 
-			if (del) {
+			if (
+				del ||
+				this._instance.disabledDefaultCommands.includes(
+					commandName!.toLowerCase()
+				)
+			) {
 				if (type === "SLASH" || type === "BOTH") {
 					if (testOnly) {
 						for (const guildId of this._instance.testServers) {
