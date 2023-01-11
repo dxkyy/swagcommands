@@ -54,7 +54,10 @@ export const command = {
 		if (!permission) {
 			const document = await requiredPermissionsSchema.findById(_id);
 
-			const permissions = document ? document.permissions.join(", ") : "None.";
+			const permissions =
+				document && document.permissions?.length
+					? document.permissions.join(", ")
+					: "None.";
 
 			return `Here are the permissions for "${commandName}": ${permissions}`;
 		}
@@ -87,6 +90,6 @@ export const command = {
 			{ upsert: true }
 		);
 
-		return `The permission "${permission}" has been added to the command "${commandName}".`;
+		return `The command "${commandName}" now requires ${permission}.`;
 	},
 };
