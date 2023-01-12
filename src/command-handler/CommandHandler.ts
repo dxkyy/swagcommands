@@ -4,18 +4,17 @@ import {
 	Message,
 	InteractionType,
 	Interaction,
-	CommandInteraction,
-	CacheType,
 	AutocompleteInteraction,
 } from "discord.js";
 import path from "path";
 import SWAGCommands from "..";
 import getAllFiles from "../util/get-all-files";
+import { cooldownTypes, cooldownTypesType } from "../util/Cooldowns";
 import Command from "./Command";
 import SlashCommands from "./SlashCommands";
-import { cooldownTypes, cooldownTypesType } from "../util/Cooldowns";
 import ChannelCommands from "./ChannelCommands";
 import CustomCommands from "./CustomCommands";
+import DisabledCommands from "./DisabledCommands";
 
 class CommandHandler {
 	// <commandName, commandObject>
@@ -29,6 +28,7 @@ class CommandHandler {
 	_client;
 	_channelCommands = new ChannelCommands();
 	_customCommands = new CustomCommands(this);
+	_disabledCommands = new DisabledCommands();
 
 	constructor(
 		instance: SWAGCommands,
@@ -60,6 +60,10 @@ class CommandHandler {
 
 	get customCommands() {
 		return this._customCommands;
+	}
+
+	get disabledCommands() {
+		return this._disabledCommands;
 	}
 
 	async readFiles() {
