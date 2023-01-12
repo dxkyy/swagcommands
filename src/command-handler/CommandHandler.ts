@@ -15,6 +15,7 @@ import SlashCommands from "./SlashCommands";
 import ChannelCommands from "./ChannelCommands";
 import CustomCommands from "./CustomCommands";
 import DisabledCommands from "./DisabledCommands";
+import PrefixHandler from "./PrefixHandler";
 
 class CommandHandler {
 	// <commandName, commandObject>
@@ -29,6 +30,7 @@ class CommandHandler {
 	_channelCommands = new ChannelCommands();
 	_customCommands = new CustomCommands(this);
 	_disabledCommands = new DisabledCommands();
+	_prefixes = new PrefixHandler();
 
 	constructor(
 		instance: SWAGCommands,
@@ -64,6 +66,10 @@ class CommandHandler {
 
 	get disabledCommands() {
 		return this._disabledCommands;
+	}
+
+	get prefixHandler() {
+		return this._prefixes;
 	}
 
 	async readFiles() {
@@ -169,7 +175,14 @@ class CommandHandler {
 		} as any;
 
 		for (const validation of this._validations) {
-			if (!(await validation.validation(command, usage, this._prefix))) return;
+			if (
+				!(await validation.validation(
+					command,
+					usage,
+					this._prefixes.get(guild?.id)
+				))
+			)
+				return;
 		}
 
 		if (cooldowns) {
@@ -208,14 +221,16 @@ class CommandHandler {
 
 	async messageListener(client: Client) {
 		client.on(Events.MessageCreate, async (message: Message) => {
-			const { content } = message;
+			const { content, guild } = message;
 
-			if (!content.startsWith(this._prefix)) return;
+			const prefix = this._prefixes.get(guild?.id);
+
+			if (!content.startsWith(prefix)) return;
 
 			const args = content.split(/\s+/);
 			const commandName = args
 				.shift()
-				?.substring(this._prefix.length)
+				?.substring(prefix.length)
 				.toLowerCase();
 
 			const command = this._commands.get(commandName) as Command;

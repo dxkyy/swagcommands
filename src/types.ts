@@ -11,7 +11,7 @@ import SWAGCommands from ".";
 export interface ISWAGCommands {
 	client: Client;
 	commandsDir?: string;
-	prefix?: string;
+	defaultPrefix?: string;
 	mongoUri?: string;
 	testServers?: string[];
 	botOwners?: string[];

@@ -15,7 +15,7 @@ class SWAGCommands {
 	constructor({
 		client,
 		commandsDir,
-		prefix = "!",
+		defaultPrefix = "!",
 		mongoUri,
 		testServers = [],
 		botOwners = [],
@@ -47,7 +47,7 @@ class SWAGCommands {
 				this,
 				commandsDir,
 				client,
-				prefix
+				defaultPrefix
 			);
 		}
 	}
