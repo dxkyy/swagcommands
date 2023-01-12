@@ -12,4 +12,5 @@ const guildPrefixSchema = new Schema({
 });
 
 const name = "guild-prefixes";
+
 export default models[name] || model(name, guildPrefixSchema);

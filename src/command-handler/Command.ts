@@ -1,29 +1,24 @@
-import SWAG, { CommandObject } from "../../typings";
+import SWAGCommands from "..";
 
 class Command {
-	private _instance: SWAG;
-	private _commandName: string;
-	private _commandObject: CommandObject;
-
-	constructor(
-		instance: SWAG,
-		commandName: string,
-		commandObject: CommandObject
-	) {
+	_instance;
+	_commandName;
+	_commandObject;
+	constructor(instance: SWAGCommands, commandName: string, commandObject: any) {
 		this._instance = instance;
 		this._commandName = commandName.toLowerCase();
 		this._commandObject = commandObject;
 	}
 
-	public get instance() {
+	get instance() {
 		return this._instance;
 	}
 
-	public get commandName() {
+	get commandName() {
 		return this._commandName;
 	}
 
-	public get commandObject() {
+	get commandObject() {
 		return this._commandObject;
 	}
 }

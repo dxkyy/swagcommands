@@ -1,13 +1,10 @@
 import Command from "../../Command";
-import { CommandUsage } from "../../../../typings";
 
-export default (command: Command, usage: CommandUsage) => {
+export const validation = (command: Command, usage: any, prefix: string) => {
 	const { instance, commandObject } = command;
 	const { guild } = usage;
 
-	if (commandObject.testOnly !== true) {
-		return true;
-	}
+	if (commandObject.testOnly !== true) return true;
 
-	return instance.testServers.includes(guild?.id || "");
+	return instance.testServers.includes(guild?.id);
 };

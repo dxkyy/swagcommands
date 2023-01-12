@@ -10,9 +10,7 @@ export const validation = (command: Command, usage: any, prefix: string) => {
 
 	if (length < minArgs || (length > maxArgs && maxArgs !== -1)) {
 		const text = `Incorrect syntax! Please use \`${prefix}${command.commandName} ${expectedArgs}\``;
-
 		const { message, interaction } = usage;
-
 		if (message) message.reply(text);
 		else if (interaction) interaction.reply(text);
 

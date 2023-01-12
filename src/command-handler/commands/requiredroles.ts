@@ -1,14 +1,17 @@
-import { PermissionFlagsBits, ApplicationCommandOptionType } from "discord.js";
-
-import requiredroles from "../../models/required-roles-schema";
-import CommandType from "../../util/CommandType";
-import { CommandObject, CommandUsage } from "../../../typings";
+import {
+	ApplicationCommandOption,
+	ApplicationCommandOptionType,
+	PermissionFlagsBits,
+} from "discord.js";
+import requiredRolesSchema from "../../models/required-roles-schema";
+import { ICallback } from "../../types";
 import Command from "../Command";
 
-export default {
-	description: "Sets what commands require what roles",
+export const command = {
+	description: "Sets which commands require which roles.",
 
-	type: CommandType.SLASH,
+	type: "SLASH",
+	testOnly: true,
 	guildOnly: true,
 
 	roles: [PermissionFlagsBits.Administrator],
@@ -16,64 +19,48 @@ export default {
 	options: [
 		{
 			name: "command",
-			description: "The command to set roles to",
+			description: "The command to set roles for.",
 			type: ApplicationCommandOptionType.String,
 			required: true,
 			autocomplete: true,
 		},
 		{
 			name: "role",
-			description: "The role to set for the command",
+			description: "The role to set for the command.",
 			type: ApplicationCommandOptionType.Role,
 			required: false,
 		},
-	],
+	] as ApplicationCommandOption[],
 
-	autocomplete: (command: Command) => {
-		return [...command.instance.commandHandler.commands.keys()];
+	autocomplete: (_: any, command: Command) => {
+		return [...command.instance.commandHandler?.commands.keys()!];
 	},
 
-	callback: async (commandUsage: CommandUsage) => {
-		const { instance, guild, args } = commandUsage;
-
-		if (!instance.isConnectedToDB) {
-			return {
-				content:
-					"This bot is not connected to a database which is required for this command. Please contact the bot owner.",
-				ephemeral: true,
-			};
-		}
-
+	callback: async ({ instance, guild, args }: ICallback) => {
 		const [commandName, role] = args;
 
-		const command = instance.commandHandler.commands.get(commandName);
-		if (!command) {
-			return {
-				content: `The command \`${commandName}\` does not exist.`,
-				ephemeral: true,
-			};
-		}
+		const command = instance.commandHandler?.commands.get(commandName);
+		if (!command) return `The command "${commandName}" does not exist.`;
 
-		const _id = `${guild!.id}-${command.commandName}`;
+		const _id = `${guild.id}-${command.commandName}`;
 
 		if (!role) {
-			const document = await requiredroles.findById(_id);
+			const document = await requiredRolesSchema.findById(_id);
 
 			const roles =
 				document && document.roles?.length
-					? document.roles.map((roleId: string) => `<@&${roleId}>`)
+					? document.roles.map((role: any) => `<@&${role}>`)
 					: "None.";
 
 			return {
-				content: `Here are the roles for \`${commandName}\`: ${roles}`,
-				ephemeral: true,
+				content: `The required roles for "${commandName}" are ${roles}`,
 				allowedMentions: {
 					roles: [],
 				},
 			};
 		}
 
-		const alreadyExists = await requiredroles.findOne({
+		const alreadyExists = await requiredRolesSchema.findOne({
 			_id,
 			roles: {
 				$in: [role],
@@ -81,48 +68,30 @@ export default {
 		});
 
 		if (alreadyExists) {
-			await requiredroles.findOneAndUpdate(
-				{
-					_id,
-				},
-				{
-					_id,
-					$pull: {
-						roles: role,
-					},
-				}
+			await requiredRolesSchema.findOneAndUpdate(
+				{ _id },
+				{ _id, $pull: { roles: role } }
 			);
 
 			return {
-				content: `The command \`${commandName}\` no longer requires the role <@&${role}> .`,
-				ephemeral: true,
+				content: `The command "${commandName}" no longer requires the role <@&${role}>.`,
 				allowedMentions: {
 					roles: [],
 				},
 			};
 		}
 
-		await requiredroles.findOneAndUpdate(
-			{
-				_id,
-			},
-			{
-				_id,
-				$addToSet: {
-					roles: role,
-				},
-			},
-			{
-				upsert: true,
-			}
+		await requiredRolesSchema.findOneAndUpdate(
+			{ _id },
+			{ _id, $addToSet: { roles: role } },
+			{ upsert: true }
 		);
 
 		return {
-			content: `The command \`${commandName}\` now requires the role <@&${role}> .`,
-			ephemeral: true,
+			content: `The role <@&${role}> has been added to the command "${commandName}".`,
 			allowedMentions: {
 				roles: [],
 			},
 		};
 	},
-} as CommandObject;
+};

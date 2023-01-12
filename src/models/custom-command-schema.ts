@@ -12,4 +12,5 @@ const customCommandSchema = new Schema({
 });
 
 const name = "custom-commands";
+
 export default models[name] || model(name, customCommandSchema);

@@ -1,16 +1,21 @@
 import Command from "../../Command";
+import { cooldownTypes } from "../../../util/Cooldowns";
 
-export default (command: Command) => {
+export const validation = (command: Command) => {
 	const { commandObject, commandName } = command;
-	const { cooldowns } = commandObject;
+	if (!commandObject.cooldowns) return;
 
-	if (!cooldowns) {
-		return;
+	let counter = 0;
+	for (const type of cooldownTypes) {
+		if (commandObject.cooldowns[type]) ++counter;
 	}
 
-	if (!cooldowns.type || !cooldowns.duration) {
+	if (counter === 0)
 		throw new Error(
-			`Invalid cooldown for command "${commandName}". It must have a "type" and "duration" property.`
+			`Command "${commandName}" does have a cooldown object, but no cooldown types were specified. Please use one of the following: ${cooldownTypes}`
 		);
-	}
+	if (counter > 1)
+		throw new Error(
+			`Command "${commandName}" has multiple cooldown types, you must specify only one.`
+		);
 };

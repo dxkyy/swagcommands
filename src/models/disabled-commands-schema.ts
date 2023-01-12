@@ -8,4 +8,5 @@ const disabledCommandSchema = new Schema({
 });
 
 const name = "disabled-commands";
+
 export default models[name] || model(name, disabledCommandSchema);
