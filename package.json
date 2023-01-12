@@ -7,7 +7,12 @@
 	"scripts": {
 		"compile": "tsc -w --outDir dist --rootDir src --skipLibCheck"
 	},
-	"keywords": [],
+	"keywords": [
+		"discord",
+		"discord.js",
+		"bot",
+		"command handler"
+	],
 	"author": "dxkyy",
 	"license": "ISC",
 	"dependencies": {
