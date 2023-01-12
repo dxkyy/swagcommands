@@ -1,105 +1,125 @@
 import {
 	Client,
-	Events,
+	CommandInteraction,
+	GuildMember,
 	Message,
-	InteractionType,
-	Interaction,
-	AutocompleteInteraction,
+	TextChannel,
 } from "discord.js";
 import path from "path";
-import SWAGCommands from "..";
+
 import getAllFiles from "../util/get-all-files";
-import { cooldownTypes, cooldownTypesType } from "../util/Cooldowns";
 import Command from "./Command";
 import SlashCommands from "./SlashCommands";
 import ChannelCommands from "./ChannelCommands";
 import CustomCommands from "./CustomCommands";
 import DisabledCommands from "./DisabledCommands";
 import PrefixHandler from "./PrefixHandler";
+import CommandType from "../util/CommandType";
+import SWAG, {
+	CommandObject,
+	CommandUsage,
+	InternalCooldownConfig,
+} from "../../typings";
+import DefaultCommands from "../util/DefaultCommands";
 
 class CommandHandler {
-	// <commandName, commandObject>
-	_commands = new Map();
-	_validations = this.getValidations("run-time");
+	// <commandName, instance of the Command class>
+	private _commands: Map<string, Command> = new Map();
+	private _validations = this.getValidations(
+		path.join(__dirname, "validations", "runtime")
+	);
+	private _instance: SWAG;
+	private _client: Client;
+	private _commandsDir: string;
+	private _slashCommands: SlashCommands;
+	private _channelCommands: ChannelCommands;
+	private _customCommands: CustomCommands;
+	private _disabledCommands: DisabledCommands;
+	private _prefixes: PrefixHandler;
 
-	_instance: SWAGCommands;
-	_commandsDir;
-	_slashCommands;
-	_prefix;
-	_client;
-	_channelCommands = new ChannelCommands();
-	_customCommands = new CustomCommands(this);
-	_disabledCommands = new DisabledCommands();
-	_prefixes = new PrefixHandler();
-
-	constructor(
-		instance: SWAGCommands,
-		commandsDir: string,
-		client: Client,
-		prefix: string
-	) {
+	constructor(instance: SWAG, commandsDir: string, client: Client) {
 		this._instance = instance;
 		this._commandsDir = commandsDir;
 		this._slashCommands = new SlashCommands(client);
-		this._prefix = prefix;
 		this._client = client;
+		this._channelCommands = new ChannelCommands(instance);
+		this._customCommands = new CustomCommands(instance, this);
+		this._disabledCommands = new DisabledCommands(instance);
+		this._prefixes = new PrefixHandler(instance);
+
+		this._validations = [
+			...this._validations,
+			...this.getValidations(instance.validations?.runtime),
+		];
+
 		this.readFiles();
-		this.interactionListener(client);
 	}
 
-	get commands() {
+	public get commands() {
 		return this._commands;
 	}
 
-	get channelCommands() {
+	public get channelCommands() {
 		return this._channelCommands;
 	}
 
-	get slashCommands() {
+	public get slashCommands() {
 		return this._slashCommands;
 	}
 
-	get customCommands() {
+	public get customCommands() {
 		return this._customCommands;
 	}
 
-	get disabledCommands() {
+	public get disabledCommands() {
 		return this._disabledCommands;
 	}
 
-	get prefixHandler() {
+	public get prefixHandler() {
 		return this._prefixes;
 	}
 
-	async readFiles() {
-		const files = getAllFiles(this._commandsDir);
+	private async readFiles() {
 		const defaultCommands = getAllFiles(path.join(__dirname, "./commands"));
-		const validations = this.getValidations("syntax");
+		const files = getAllFiles(this._commandsDir);
+		const validations = [
+			...this.getValidations(path.join(__dirname, "validations", "syntax")),
+			...this.getValidations(this._instance.validations?.syntax),
+		];
 
-		for (const file of [...files, ...defaultCommands]) {
-			const commandObject = require(file).command;
+		for (let fileData of [...defaultCommands, ...files]) {
+			const { filePath } = fileData;
+			const commandObject: CommandObject = fileData.fileContents;
 
-			let commandName = file
-				.split(/[\/\\]/)
-				.pop()
-				?.split(".")[0];
+			const split = filePath.split(/[\/\\]/);
+			let commandName = split.pop()!;
+			commandName = commandName.split(".")[0];
 
-			const command = new Command(this._instance, commandName!, commandObject);
+			const command = new Command(this._instance, commandName, commandObject);
 
 			const {
-				testOnly,
 				description,
 				type,
+				testOnly,
 				delete: del,
 				aliases = [],
 				init = () => {},
 			} = commandObject;
 
+			let defaultCommandValue: DefaultCommands | undefined;
+
+			for (const [key, value] of Object.entries(DefaultCommands)) {
+				if (value === commandName.toLowerCase()) {
+					defaultCommandValue =
+						DefaultCommands[key as keyof typeof DefaultCommands];
+					break;
+				}
+			}
+
 			if (
 				del ||
-				this._instance.disabledDefaultCommands.includes(
-					commandName!.toLowerCase()
-				)
+				(defaultCommandValue &&
+					this._instance.disabledDefaultCommands.includes(defaultCommandValue))
 			) {
 				if (type === "SLASH" || type === "BOTH") {
 					if (testOnly) {
@@ -110,11 +130,12 @@ class CommandHandler {
 						this._slashCommands.delete(command.commandName);
 					}
 				}
+
 				continue;
 			}
 
 			for (const validation of validations) {
-				validation.validation(command);
+				validation(command);
 			}
 
 			await init(this._client, this._instance);
@@ -134,34 +155,45 @@ class CommandHandler {
 					for (const guildId of this._instance.testServers) {
 						this._slashCommands.create(
 							command.commandName,
-							description,
+							description!,
 							options,
 							guildId
 						);
 					}
 				} else {
-					this._slashCommands.create(command.commandName, description, options);
+					this._slashCommands.create(
+						command.commandName,
+						description!,
+						options
+					);
 				}
 			}
 		}
 	}
 
-	async runCommand(
+	public async runCommand(
 		command: Command,
 		args: string[],
-		message: Message,
-		interaction: Interaction
+		message: Message | null,
+		interaction: CommandInteraction | null
 	) {
 		const { callback, type, cooldowns } = command.commandObject;
 
-		if (message && type === "SLASH") return;
+		if (message && type === CommandType.SLASH) {
+			return;
+		}
 
-		const guild = message ? message.guild : interaction.guild;
-		const member = message ? message.member : interaction.member;
-		const user = message ? message.author : interaction.user;
-		const channel = message ? message.channel : interaction.channel;
+		const guild = message ? message.guild : interaction?.guild;
+		const member = (message
+			? message.member
+			: interaction?.member) as GuildMember;
+		const user = message ? message.author : interaction?.user;
+		const channel = (message
+			? message.channel
+			: interaction?.channel) as TextChannel;
 
-		const usage = {
+		const usage: CommandUsage = {
+			client: command.instance.client,
 			instance: command.instance,
 			message,
 			interaction,
@@ -169,122 +201,52 @@ class CommandHandler {
 			text: args.join(" "),
 			guild,
 			member,
-			user,
+			user: user!,
 			channel,
-		} as any;
+		};
 
 		for (const validation of this._validations) {
-			if (
-				!(await validation.validation(
-					command,
-					usage,
-					this._prefixes.get(guild?.id)
-				))
-			)
+			if (!(await validation(command, usage, this._prefixes.get(guild?.id)))) {
 				return;
+			}
 		}
 
 		if (cooldowns) {
-			let cooldownType: cooldownTypesType = "global";
-			for (const type of cooldownTypes) {
-				if (cooldowns[type]) {
-					cooldownType = type as cooldownTypesType;
-					break;
-				}
-			}
-			const cooldownUsage = {
-				cooldownType,
-				userId: user.id,
+			const cooldownUsage: InternalCooldownConfig = {
+				cooldownType: cooldowns.type,
+				userId: user!.id,
 				actionId: `command_${command.commandName}`,
 				guildId: guild?.id,
-				duration: cooldowns[cooldownType],
+				duration: cooldowns.duration,
 				errorMessage: cooldowns.errorMessage,
 			};
 
-			const result = this._instance.cooldowns.canRunAction(cooldownUsage);
-			if (typeof result === "string") return result;
+			const result = this._instance.cooldowns?.canRunAction(cooldownUsage);
 
-			await this._instance.cooldowns.start(cooldownUsage);
+			if (typeof result === "string") {
+				return result;
+			}
+
+			await this._instance.cooldowns?.start(cooldownUsage);
 
 			usage.cancelCooldown = () => {
-				this._instance.cooldowns.cancelCooldown(cooldownUsage);
+				this._instance.cooldowns?.cancelCooldown(cooldownUsage);
 			};
 
 			usage.updateCooldown = (expires: Date) => {
-				this._instance.cooldowns.updateCooldown(cooldownUsage, expires);
+				this._instance.cooldowns?.updateCooldown(cooldownUsage, expires);
 			};
 		}
 
 		return await callback(usage);
 	}
 
-	async interactionListener(client: Client) {
-		client.on("interactionCreate", async (interaction) => {
-			if (interaction.type === InteractionType.ApplicationCommandAutocomplete) {
-				await this.handleAutocomplete(interaction);
-				return;
-			}
+	private getValidations(folder?: string) {
+		if (!folder) {
+			return [];
+		}
 
-			if (interaction.type !== InteractionType.ApplicationCommand) return;
-
-			const args = interaction.options.data.map(({ value }) => {
-				return String(value);
-			});
-
-			const command = this._commands.get(interaction.commandName) as Command;
-			if (!command) {
-				this._customCommands.run(interaction.commandName!, null, interaction);
-
-				return;
-			}
-
-			const { deferReply } = command.commandObject;
-
-			if (deferReply)
-				await interaction.deferReply({ ephemeral: deferReply === "ephemeral" });
-
-			const response = await this.runCommand(command, args, null!, interaction);
-			if (!response) return;
-
-			if (deferReply) interaction.editReply(response).catch(() => {});
-			else interaction.reply(response).catch(() => {});
-		});
-	}
-
-	async handleAutocomplete(interaction: AutocompleteInteraction) {
-		const command = this._commands.get(interaction.commandName) as Command;
-		if (!command) return;
-
-		const { autocomplete } = command.commandObject;
-		if (!autocomplete) return;
-
-		const focusedOption = interaction.options.getFocused(true);
-		const choices = await autocomplete(
-			interaction,
-			command,
-			focusedOption.name
-		);
-
-		const filtered = choices
-			.filter((choice: string) =>
-				choice.toLowerCase().startsWith(focusedOption.value.toLowerCase())
-			)
-			.slice(0, 25);
-
-		await interaction.respond(
-			filtered.map((choice: string) => ({
-				name: choice,
-				value: choice,
-			}))
-		);
-	}
-
-	getValidations(folder: string) {
-		const validations = getAllFiles(
-			path.join(__dirname, `./validations/${folder}`)
-		).map((filePath) => require(filePath));
-
-		return validations;
+		return getAllFiles(folder).map((fileData) => fileData.fileContents);
 	}
 }
 

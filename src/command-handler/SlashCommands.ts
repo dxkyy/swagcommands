@@ -3,15 +3,12 @@ import {
 	ApplicationCommandOptionType,
 	Client,
 } from "discord.js";
-import { Logger } from "../lib/structures/Logger";
-import Command from "./Command";
 
 class SlashCommands {
-	_client;
-	_logger;
+	private _client: Client;
+
 	constructor(client: Client) {
 		this._client = client;
-		this._logger = new Logger();
 	}
 
 	async getCommands(guildId?: string) {
@@ -73,7 +70,7 @@ class SlashCommands {
 				options.length !== existingOptions.length ||
 				this.areOptionsDifferent(options, existingOptions)
 			) {
-				this._logger.info(`Updating the command "${name}"`);
+				console.log(`Updating the command "${name}"`);
 
 				await commands.edit(existingCommand.id, {
 					description,
@@ -103,8 +100,11 @@ class SlashCommands {
 		await existingCommand.delete();
 	}
 
-	createOptions({ expectedArgs = "", minArgs = 0 }) {
-		const options: any[] = [];
+	createOptions({
+		expectedArgs = "",
+		minArgs = 0,
+	}): ApplicationCommandOption[] {
+		const options: ApplicationCommandOption[] = [];
 
 		if (expectedArgs) {
 			const split = expectedArgs

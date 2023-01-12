@@ -1,17 +1,16 @@
+import requiredRoles from "../../../models/required-roles-schema";
 import Command from "../../Command";
-import requiredRolesSchema from "../../../models/required-roles-schema";
+import { CommandUsage } from "../../../../typings";
 
-export const validation = async (
-	command: Command,
-	usage: any,
-	prefix: string
-) => {
-	const { member, guild, message, interaction } = usage;
+export default async (command: Command, usage: CommandUsage) => {
+	const { instance, guild, member, message, interaction } = usage;
 
-	if (!member) return true;
+	if (!member || !instance.isConnectedToDB) {
+		return true;
+	}
 
-	const _id = `${guild.id}-${command.commandName}`;
-	const document = await requiredRolesSchema.findById(_id);
+	const _id = `${guild!.id}-${command.commandName}`;
+	const document = await requiredRoles.findById(_id);
 
 	if (document) {
 		let hasRole = false;
@@ -23,11 +22,13 @@ export const validation = async (
 			}
 		}
 
-		if (hasRole) return true;
+		if (hasRole) {
+			return true;
+		}
 
 		const reply = {
 			content: `You need one of these roles: ${document.roles.map(
-				(role: any) => `<@&${role}>`
+				(roleId: string) => `<@&${roleId}>`
 			)}`,
 			allowedMentions: {
 				roles: [],

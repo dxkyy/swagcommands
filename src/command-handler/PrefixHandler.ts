@@ -1,36 +1,61 @@
 import guildPrefixSchema from "../models/guild-prefix-schema";
+import SWAG from "../../typings";
 
 class PrefixHandler {
-	_prefixes = new Map();
-	_defaultPrefix = "!";
+	// <guildId: prefix>
+	private _prefixes = new Map();
+	private _defaultPrefix = "!";
+	private _instance: SWAG;
 
-	constructor() {
+	constructor(instance: SWAG) {
+		this._instance = instance;
+		if (instance.defaultPrefix) this._defaultPrefix = instance.defaultPrefix;
+
 		this.loadPrefixes();
 	}
 
-	async loadPrefixes() {
-		const results = await guildPrefixSchema.find();
+	private async loadPrefixes() {
+		if (!this._instance.isConnectedToDB) {
+			return;
+		}
+
+		const results = await guildPrefixSchema.find({});
+
 		for (const result of results) {
 			this._prefixes.set(result._id, result.prefix);
 		}
 	}
 
-	get defaultPrefix() {
+	public get defaultPrefix() {
 		return this._defaultPrefix;
 	}
 
-	get(guildId?: string) {
-		if (!guildId) return this.defaultPrefix;
+	public get(guildId?: string) {
+		if (!guildId) {
+			return this.defaultPrefix;
+		}
 
 		return this._prefixes.get(guildId) || this.defaultPrefix;
 	}
 
-	async set(guildId: string, prefix: string) {
+	public async set(guildId: string, prefix: string) {
+		if (!this._instance.isConnectedToDB) {
+			return;
+		}
+
 		this._prefixes.set(guildId, prefix);
+
 		await guildPrefixSchema.findOneAndUpdate(
-			{ _id: guildId },
-			{ _id: guildId, prefix },
-			{ upsert: true }
+			{
+				_id: guildId,
+			},
+			{
+				_id: guildId,
+				prefix,
+			},
+			{
+				upsert: true,
+			}
 		);
 	}
 }
