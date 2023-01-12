@@ -7,6 +7,9 @@ import SWAG, { Events, Options, Validations } from "../typings";
 import Cooldowns from "./util/Cooldowns";
 import DefaultCommands from "./util/DefaultCommands";
 import FeaturesHandler from "./util/FeaturesHandler";
+import { Logger } from "./logger/structures/Logger";
+
+export const logger = new Logger();
 
 class SWAGCommands {
 	private _client!: Client;

@@ -1,6 +1,6 @@
 import Command from "../../Command";
 
-export const validation = (command: Command, usage: any, prefix: string) => {
+export default (command: Command, usage: any, prefix: string) => {
 	const {
 		minArgs = 0,
 		maxArgs = -1,

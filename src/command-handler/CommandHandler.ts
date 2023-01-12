@@ -26,7 +26,7 @@ class CommandHandler {
 	// <commandName, instance of the Command class>
 	private _commands: Map<string, Command> = new Map();
 	private _validations = this.getValidations(
-		path.join(__dirname, "validations", "runtime")
+		path.join(__dirname, "validations", "run-time")
 	);
 	private _instance: SWAG;
 	private _client: Client;
