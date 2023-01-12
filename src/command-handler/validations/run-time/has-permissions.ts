@@ -1,36 +1,27 @@
+import { PermissionFlagsBits } from "discord.js";
+
+import requiredPermissions from "../../../models/required-permissions-schema";
 import Command from "../../Command";
-import {
-	CommandInteraction,
-	Guild,
-	GuildMember,
-	Message,
-	PermissionFlagsBits,
-} from "discord.js";
-import requiredPermissionsSchema from "../../../models/required-permissions-schema";
+import { CommandUsage } from "../../../../typings";
 
 const keys = Object.keys(PermissionFlagsBits);
 
-export const validation = async (
-	command: Command,
-	usage: any,
-	prefix: string
-) => {
+export default async (command: Command, usage: CommandUsage) => {
 	const { permissions = [] } = command.commandObject;
-	const { member, message, interaction, guild } = usage as {
-		member: GuildMember;
-		message: Message;
-		interaction: CommandInteraction;
-		guild: Guild;
-	};
+	const { instance, guild, member, message, interaction } = usage;
 
-	if (!member) return true;
+	if (!member || !instance.isConnectedToDB) {
+		return true;
+	}
 
-	const document = await requiredPermissionsSchema.findById(
-		`${guild.id}-${command.commandName}`
+	const document = await requiredPermissions.findById(
+		`${guild!.id}-${command.commandName}`
 	);
 	if (document) {
 		for (const permission of document.permissions) {
-			if (!permissions.includes(permission)) permissions.push(permission);
+			if (!permissions.includes(permission)) {
+				permissions.push(permission);
+			}
 		}
 	}
 
@@ -38,21 +29,20 @@ export const validation = async (
 		const missingPermissions = [];
 
 		for (const permission of permissions) {
+			// @ts-ignore
 			if (!member.permissions.has(permission)) {
 				const permissionName = keys.find(
-					(key) =>
-						key === permission ||
-						PermissionFlagsBits[key as keyof typeof PermissionFlagsBits] ===
-							permission
+					// @ts-ignore
+					(key) => key === permission || PermissionFlagsBits[key] === permission
 				);
 				missingPermissions.push(permissionName);
 			}
 		}
 
 		if (missingPermissions.length) {
-			const text = `You are missing the following permissions to perform this action: ${missingPermissions.join(
-				", "
-			)}`;
+			const text = `You are missing the following permissions to perform this action: \`${missingPermissions.join(
+				'", "'
+			)}\``;
 
 			if (message) message.reply(text);
 			else if (interaction) interaction.reply(text);

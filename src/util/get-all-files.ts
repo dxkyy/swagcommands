@@ -1,19 +1,34 @@
 import fs from "fs";
 import p from "path";
 
+import { FileData } from "../../typings";
+
 const getAllFiles = (path: string, foldersOnly = false) => {
-	const files = fs.readdirSync(path, { withFileTypes: true });
-	let filesFound: string[] = [];
+	const files = fs.readdirSync(path, {
+		withFileTypes: true,
+	});
+	let filesFound: FileData[] = [];
 
 	for (const file of files) {
-		const fileName = p.join(path, file.name);
+		const filePath = p.join(path, file.name);
+
 		if (file.isDirectory()) {
-			if (foldersOnly) filesFound.push(fileName);
-			else filesFound = [...filesFound, ...getAllFiles(fileName)];
+			if (foldersOnly) {
+				filesFound.push({
+					filePath,
+					fileContents: file,
+				});
+			} else {
+				filesFound = [...filesFound, ...getAllFiles(filePath)];
+			}
 			continue;
 		}
 
-		filesFound.push(fileName);
+		const fileContents = require(filePath);
+		filesFound.push({
+			filePath,
+			fileContents: fileContents?.default || fileContents,
+		});
 	}
 
 	return filesFound;

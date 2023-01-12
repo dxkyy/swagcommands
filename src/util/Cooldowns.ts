@@ -1,61 +1,39 @@
-import SWAGCommands from "..";
-import { CooldownConfig, InternalCooldownConfig } from "../types";
 import cooldownSchema from "../models/cooldown-schema";
+import CooldownTypes from "../util/CooldownTypes";
+import SWAG, { CooldownConfig, InternalCooldownConfig } from "../../typings";
 
-const cooldownDurations: any = {
+const cooldownDurations = {
 	s: 1,
 	m: 60,
 	h: 60 * 60,
 	d: 60 * 60 * 24,
-};
-
-export type cooldownTypesType =
-	| "perUser"
-	| "perUserPerGuild"
-	| "perGuild"
-	| "global";
-
-export const cooldownTypes = [
-	"perUser",
-	"perUserPerGuild",
-	"perGuild",
-	"global",
-];
+} as { [key: string]: number };
 
 class Cooldowns {
-	/*
-	 * perUser:
-	 * <`${userId}-${actionId}`: expires>
-	 *
-	 * perUserPerGuild:
-	 * <`${userId}-${guildId}-${actionId}`: expires>
-	 *
-	 * perGuild:
-	 * <`${guildId}-${actionId}`: expires>
-	 *
-	 * global:
-	 * <action: expires>
-	 */
-	_cooldowns = new Map();
-	_instance: SWAGCommands;
-	_errorMessage: string;
-	_botOwnersBypass: boolean;
-	_dbRequired: number;
+	private _cooldowns: Map<string, Date> = new Map();
+	private _instance: SWAG;
+	private _errorMessage: string;
+	private _botOwnersBypass: boolean;
+	private _dbRequired: number;
 
-	constructor(instance: SWAGCommands, cooldownConfig: CooldownConfig) {
+	constructor(instance: SWAG, cooldownConfig: CooldownConfig) {
+		const { errorMessage, botOwnersBypass, dbRequired } = cooldownConfig;
+
 		this._instance = instance;
-		this._errorMessage =
-			cooldownConfig.errorMessage ||
-			"Please wait {TIME} before doing that again.";
-		this._botOwnersBypass = cooldownConfig.botOwnersBypass;
-		this._dbRequired = cooldownConfig.dbRequired;
+		this._errorMessage = errorMessage;
+		this._botOwnersBypass = botOwnersBypass;
+		this._dbRequired = dbRequired;
 
 		this.loadCooldowns();
 	}
 
-	async loadCooldowns() {
+	private async loadCooldowns() {
+		if (!this._instance.isConnectedToDB) {
+			return;
+		}
+
 		await cooldownSchema.deleteMany({
-			expires: { $lt: Date.now() },
+			expires: { $lt: new Date() },
 		});
 
 		const results = await cooldownSchema.find({});
@@ -67,136 +45,183 @@ class Cooldowns {
 		}
 	}
 
-	getKeyFromCooldownUsage(cooldownUsage: InternalCooldownConfig) {
-		const { cooldownType, userId, guildId, actionId } = cooldownUsage;
+	public getKeyFromCooldownUsage(cooldownUsage: InternalCooldownConfig) {
+		const { cooldownType, userId, actionId, guildId } = cooldownUsage;
 
-		return this.getKey(cooldownType, userId, actionId, guildId!);
+		return this.getKey(cooldownType, userId, actionId, guildId);
 	}
 
-	async cancelCooldown(cooldownUsage: InternalCooldownConfig) {
+	public async cancelCooldown(cooldownUsage: InternalCooldownConfig) {
 		const key = this.getKeyFromCooldownUsage(cooldownUsage);
 
 		this._cooldowns.delete(key);
 
-		await cooldownSchema.deleteOne({ _id: key });
+		if (this._instance.isConnectedToDB) {
+			await cooldownSchema.deleteOne({ _id: key });
+		}
 	}
 
-	async updateCooldown(cooldownUsage: InternalCooldownConfig, expires: Date) {
+	public async updateCooldown(
+		cooldownUsage: InternalCooldownConfig,
+		expires: Date
+	) {
 		const key = this.getKeyFromCooldownUsage(cooldownUsage);
 
 		this._cooldowns.set(key, expires);
+
+		if (!this._instance.isConnectedToDB) {
+			return;
+		}
 
 		const now = new Date();
 		const secondsDiff = (expires.getTime() - now.getTime()) / 1000;
 
 		if (secondsDiff > this._dbRequired) {
 			await cooldownSchema.findOneAndUpdate(
-				{ _id: key },
-				{ _id: key, expires },
-				{ upsert: true }
+				{
+					_id: key,
+				},
+				{
+					_id: key,
+					expires,
+				},
+				{
+					upsert: true,
+				}
 			);
 		}
 	}
 
-	verifyCooldown(duration: number | string) {
-		if (typeof duration === "number") return duration;
+	public verifyCooldown(duration: number | string) {
+		if (typeof duration === "number") {
+			return duration;
+		}
 
 		const split = duration.split(" ");
-		if (split.length !== 2)
+
+		if (split.length !== 2) {
 			throw new Error(
-				`Duration "${duration}" is an invalid duration. Please use "10 m", "15 s", etc..`
+				`Duration "${duration}" is an invalid duration. Please use "10 m", "15 s" etc.`
 			);
+		}
 
 		const quantity = +split[0];
 		const type = split[1].toLowerCase();
-		if (!cooldownDurations[type])
+
+		if (!cooldownDurations[type]) {
 			throw new Error(
 				`Unknown duration type "${type}". Please use one of the following: ${Object.keys(
 					cooldownDurations
 				)}`
 			);
+		}
 
-		if (quantity <= 0)
+		if (quantity <= 0) {
 			throw new Error(
-				`Invalid quantity of "${quantity}". Please use a value grater than 0.`
+				`Invalid quantity of "${quantity}". Please use a value greater than 0.`
 			);
+		}
 
 		return quantity * cooldownDurations[type];
 	}
 
-	getKey(
-		cooldownType: cooldownTypesType,
+	public getKey(
+		cooldownType: CooldownTypes,
 		userId: string,
 		actionId: string,
-		guildId: string
-	) {
-		const isPerUser = cooldownType === "perUser";
-		const isPerUserPerGuild = cooldownType === "perUserPerGuild";
-		const isPerGuild = cooldownType === "perGuild";
-		const isGlobal = cooldownType === "global";
+		guildId?: string
+	): string {
+		const isPerUser = cooldownType === CooldownTypes.perUser;
+		const isPerUserPerGuild = cooldownType === CooldownTypes.perUserPerGuild;
+		const isPerGuild = cooldownType === CooldownTypes.perGuild;
+		const isGlobal = cooldownType === CooldownTypes.global;
 
-		if ((isPerUserPerGuild || isPerGuild) && !guildId)
+		if ((isPerUserPerGuild || isPerGuild) && !guildId) {
 			throw new Error(
 				`Invalid cooldown type "${cooldownType}" used outside of a guild.`
 			);
+		}
 
-		if (isPerUser) return `${userId}-${actionId}`;
-		if (isPerUserPerGuild) return `${userId}-${guildId}-${actionId}`;
-		if (isPerGuild) return `${guildId}-${actionId}`;
-		if (isGlobal) return actionId;
+		if (isPerUser) {
+			return `${userId}-${actionId}`;
+		}
+
+		if (isPerUserPerGuild) {
+			return `${userId}-${guildId}-${actionId}`;
+		}
+
+		if (isPerGuild) {
+			return `${guildId}-${actionId}`;
+		}
+
+		if (isGlobal) {
+			return actionId;
+		}
+
+		return "ERROR";
 	}
 
-	canBypass(userId: string) {
+	public canBypass(userId: string) {
 		return this._botOwnersBypass && this._instance.botOwners.includes(userId);
 	}
 
-	async start({
-		cooldownType,
-		userId,
-		actionId,
-		guildId = "",
-		duration,
-	}: InternalCooldownConfig) {
-		if (this.canBypass(userId)) return;
+	public async start(cooldownUsage: InternalCooldownConfig) {
+		const {
+			cooldownType,
+			userId,
+			actionId,
+			guildId = "",
+			duration,
+		} = cooldownUsage;
 
-		if (!cooldownTypes.includes(cooldownType))
-			throw new Error(
-				`Invalid cooldown type "${cooldownType}". Please use one of the following: ${cooldownTypes}`
-			);
+		if (this.canBypass(userId)) {
+			return;
+		}
 
 		const seconds = this.verifyCooldown(duration!);
 
 		const key = this.getKey(cooldownType, userId, actionId, guildId);
+
 		const expires = new Date();
 		expires.setSeconds(expires.getSeconds() + seconds);
 
-		if (seconds >= this._dbRequired) {
+		if (this._instance.isConnectedToDB && seconds >= this._dbRequired) {
 			await cooldownSchema.findOneAndUpdate(
-				{ _id: key },
+				{
+					_id: key,
+				},
 				{
 					_id: key,
 					expires,
 				},
-				{ upsert: true }
+				{
+					upsert: true,
+				}
 			);
 		}
 
 		this._cooldowns.set(key, expires);
 	}
 
-	canRunAction({
-		cooldownType,
-		userId,
-		actionId,
-		guildId = "",
-		errorMessage = this._errorMessage,
-	}: InternalCooldownConfig) {
-		if (this.canBypass(userId)) return true;
+	public canRunAction(cooldownUsage: InternalCooldownConfig) {
+		const {
+			cooldownType,
+			userId,
+			actionId,
+			guildId = "",
+			errorMessage = this._errorMessage,
+		} = cooldownUsage;
+
+		if (this.canBypass(userId)) {
+			return true;
+		}
 
 		const key = this.getKey(cooldownType, userId, actionId, guildId);
 		const expires = this._cooldowns.get(key);
 
-		if (!expires) return true;
+		if (!expires) {
+			return true;
+		}
 
 		const now = new Date();
 		if (now > expires) {

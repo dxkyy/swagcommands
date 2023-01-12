@@ -1,17 +1,20 @@
 import Command from "../../Command";
+import { CommandUsage } from "../../../../typings";
 
-export const validation = async (command: Command, usage: any) => {
+export default async (command: Command, usage: CommandUsage) => {
 	const { commandName, instance } = command;
 	const { guild, message, interaction } = usage;
 
-	if (!guild) return true;
+	if (!guild || !instance.isConnectedToDB) {
+		return true;
+	}
 
 	if (
-		instance.commandHandler?.disabledCommands.isDisabled(guild.id, commandName)
+		instance.commandHandler.disabledCommands.isDisabled(guild.id, commandName)
 	) {
-		const text = `This command has been disabled for this guild.`;
+		const text = "This command has been disabled by an administrator.";
 
-		if (message) message.reply(text);
+		if (message) message.channel.send(text);
 		else if (interaction) interaction.reply(text);
 
 		return false;

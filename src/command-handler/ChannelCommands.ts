@@ -1,26 +1,43 @@
-import channelCommandsSchema from "../models/channel-commands-schema";
+import SWAG from "../../typings";
+import channelCommands from "../models/channel-commands-schema";
 
 class ChannelCommands {
 	// `${guildId}-${commandName}`: [channelIds]
-	_channelCommands = new Map();
+	private _channelCommands: Map<string, string[]> = new Map();
+	private _instance: SWAG;
+
+	constructor(instance: SWAG) {
+		this._instance = instance;
+	}
 
 	async action(
-		action: string,
+		action: "add" | "remove",
 		guildId: string,
 		commandName: string,
 		channelId: string
 	) {
+		if (!this._instance.isConnectedToDB) {
+			return;
+		}
+
 		const _id = `${guildId}-${commandName}`;
 
-		const result = await channelCommandsSchema.findOneAndUpdate(
-			{ _id },
+		const result = await channelCommands.findOneAndUpdate(
 			{
 				_id,
-				[action === "add" ? "$addToSet" : "$pull"]: { channels: channelId },
 			},
-			{ upsert: true, new: true }
+			{
+				_id,
+				[action === "add" ? "$addToSet" : "$pull"]: {
+					channels: channelId,
+				},
+			},
+			{
+				upsert: true,
+				new: true,
+			}
 		);
-		console.log(result);
+
 		this._channelCommands.set(_id, result.channels);
 		return result.channels;
 	}
@@ -34,13 +51,17 @@ class ChannelCommands {
 	}
 
 	async getAvailableChannels(guildId: string, commandName: string) {
+		if (!this._instance.isConnectedToDB) {
+			return [];
+		}
+
 		const _id = `${guildId}-${commandName}`;
 		let channels = this._channelCommands.get(_id);
 
 		if (!channels) {
-			const results = await channelCommandsSchema.findById(_id);
+			const results = await channelCommands.findById(_id);
 			channels = results ? results.channels : [];
-			this._channelCommands.set(_id, channels);
+			this._channelCommands.set(_id, channels!);
 		}
 
 		return channels;
