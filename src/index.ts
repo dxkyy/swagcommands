@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { ISWAGCommands } from "./types";
 import Cooldowns from "./util/Cooldowns";
 import { Logger } from "./lib/structures/Logger";
+import EventHandler from "./event-handler/EventHandler";
 export const logger = new Logger();
 
 class SWAGCommands {
@@ -11,6 +12,7 @@ class SWAGCommands {
 	_cooldowns;
 	_logger = logger;
 	_commandHandler;
+	_eventHandler;
 	_disabledDefaultCommands;
 	constructor({
 		client,
@@ -21,6 +23,7 @@ class SWAGCommands {
 		botOwners = [],
 		cooldownConfig,
 		disabledDefaultCommands = [],
+		events,
 	}: ISWAGCommands) {
 		if (!client) {
 			throw new Error("A client is required.");
@@ -50,6 +53,9 @@ class SWAGCommands {
 				defaultPrefix
 			);
 		}
+		if (events?.dir) {
+			this._eventHandler = new EventHandler(this, events, client);
+		}
 	}
 
 	get testServers() {
@@ -74,6 +80,10 @@ class SWAGCommands {
 
 	get commandHandler() {
 		return this._commandHandler;
+	}
+
+	get eventHandler() {
+		return this._eventHandler;
 	}
 
 	connectToMongo(mongoUri: string) {

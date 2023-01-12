@@ -1,21 +1,22 @@
 import fs from "fs";
 import p from "path";
 
-const getAllFiles = (path: string) => {
+const getAllFiles = (path: string, foldersOnly = false) => {
 	const files = fs.readdirSync(path, { withFileTypes: true });
-	let commandFiles: string[] = [];
+	let filesFound: string[] = [];
 
 	for (const file of files) {
 		const fileName = p.join(path, file.name);
 		if (file.isDirectory()) {
-			commandFiles = [...commandFiles, ...getAllFiles(fileName)];
+			if (foldersOnly) filesFound.push(fileName);
+			else filesFound = [...filesFound, ...getAllFiles(fileName)];
 			continue;
 		}
 
-		commandFiles.push(fileName);
+		filesFound.push(fileName);
 	}
 
-	return commandFiles;
+	return filesFound;
 };
 
 export default getAllFiles;

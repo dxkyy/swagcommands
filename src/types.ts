@@ -11,12 +11,18 @@ import SWAGCommands from ".";
 export interface ISWAGCommands {
 	client: Client;
 	commandsDir?: string;
+	events?: Events;
 	defaultPrefix?: string;
 	mongoUri?: string;
 	testServers?: string[];
 	botOwners?: string[];
 	cooldownConfig?: CooldownConfig;
 	disabledDefaultCommands?: string[];
+}
+
+export interface Events {
+	dir?: string;
+	[key: string]: any;
 }
 
 export interface CooldownConfig {

@@ -44,7 +44,6 @@ class CommandHandler {
 		this._prefix = prefix;
 		this._client = client;
 		this.readFiles();
-		this.messageListener(client);
 		this.interactionListener(client);
 	}
 
@@ -81,7 +80,7 @@ class CommandHandler {
 			const commandObject = require(file).command;
 
 			let commandName = file
-				.split(/[/\\]/)
+				.split(/[\/\\]/)
 				.pop()
 				?.split(".")[0];
 
@@ -217,43 +216,6 @@ class CommandHandler {
 		}
 
 		return await callback(usage);
-	}
-
-	async messageListener(client: Client) {
-		client.on(Events.MessageCreate, async (message: Message) => {
-			const { content, guild } = message;
-
-			const prefix = this._prefixes.get(guild?.id);
-
-			if (!content.startsWith(prefix)) return;
-
-			const args = content.split(/\s+/);
-			const commandName = args
-				.shift()
-				?.substring(prefix.length)
-				.toLowerCase();
-
-			const command = this._commands.get(commandName) as Command;
-			if (!command) {
-				this._customCommands.run(commandName!, message);
-				return;
-			}
-
-			const { reply, deferReply } = command.commandObject;
-
-			if (deferReply) message.channel.sendTyping();
-
-			const response = await this.runCommand(
-				command,
-				args,
-				message,
-				undefined!
-			);
-			if (!response) return;
-
-			if (reply) message.reply(response).catch(() => {});
-			else message.channel.send(response).catch(() => {});
-		});
 	}
 
 	async interactionListener(client: Client) {
