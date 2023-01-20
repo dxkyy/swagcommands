@@ -1,6 +1,4 @@
 import { PermissionFlagsBits } from "discord.js";
-
-import requiredPermissions from "../../../models/required-permissions-schema";
 import Command from "../../Command";
 import { CommandUsage } from "../../../../typings";
 
@@ -10,19 +8,8 @@ export default async (command: Command, usage: CommandUsage) => {
 	const { permissions = [] } = command.commandObject;
 	const { instance, guild, member, message, interaction } = usage;
 
-	if (!member || !instance.isConnectedToDB) {
+	if (!member) {
 		return true;
-	}
-
-	const document = await requiredPermissions.findById(
-		`${guild!.id}-${command.commandName}`
-	);
-	if (document) {
-		for (const permission of document.permissions) {
-			if (!permissions.includes(permission)) {
-				permissions.push(permission);
-			}
-		}
 	}
 
 	if (permissions.length) {
