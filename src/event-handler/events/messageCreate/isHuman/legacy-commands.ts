@@ -18,10 +18,18 @@ export default async (message: Message, instance: SWAG) => {
 	}
 
 	const args = content.split(/\s+/);
-	const commandName = args
+	let commandName;
+	if (prefix.includes(" ")) {
+		args[0] = prefix;
+	}
+	commandName = args
 		.shift()!
 		.substring(prefix.length)
 		.toLowerCase();
+
+	if (prefix.includes(" ")) {
+		commandName = args.shift()!.toLowerCase();
+	}
 
 	const command = commands.get(commandName);
 	if (!command) {
