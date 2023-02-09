@@ -18,8 +18,9 @@ export default {
 	],
 
 	callback: async ({ message, interaction, instance, args, guild }) => {
-		const commands = instance.commandHandler.commands;
-		const prefix = instance.commandHandler.prefixHandler.get(guild?.id);
+		const { commandHandler } = instance;
+		const { prefixHandler, commands } = commandHandler;
+		const prefix = prefixHandler.get(guild?.id);
 
 		const commandNames = new Map(
 			[...commands].map(([name, command]) => [command.commandName, command])
