@@ -17,8 +17,9 @@ export default {
 		},
 	],
 
-	callback: async ({ message, interaction, instance, args }) => {
+	callback: async ({ message, interaction, instance, args, guild }) => {
 		const commands = instance.commandHandler.commands;
+		const prefix = instance.commandHandler.prefixHandler.get(guild?.id);
 
 		const commandNames = new Map(
 			[...commands].map(([name, command]) => [command.commandName, command])
@@ -26,7 +27,7 @@ export default {
 
 		if (args.length === 0) {
 			const commandNamesString = [...commandNames.keys()]
-				.map((name) => `**${instance.commandHandler.prefix}${name}**\n`)
+				.map((name) => `**${prefix}${name}**\n`)
 				.join("");
 
 			const embed = new EmbedBuilder()
@@ -60,8 +61,7 @@ export default {
 
 		const { description, expectedArgs, aliases } = command.commandObject;
 
-		const usage = `${instance.commandHandler.prefix}${name} ${expectedArgs ||
-			""}`;
+		const usage = `${prefix}${name} ${expectedArgs || ""}`;
 		const aliasesString = aliases ? aliases.join(", ") : "None";
 
 		const embed = new EmbedBuilder()
