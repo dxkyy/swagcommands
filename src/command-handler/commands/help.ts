@@ -1,5 +1,7 @@
 import { ApplicationCommandOptionType, EmbedBuilder } from "discord.js";
-import { CommandObject, CommandType } from "../../../typings";
+import CommandType from "../../util/CommandType";
+
+import { CommandObject } from "../../../typings";
 
 export default {
 	description: "Shows a list of all commands",
