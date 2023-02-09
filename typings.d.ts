@@ -3,6 +3,7 @@ import {
 	Client,
 	CommandInteraction,
 	Guild,
+	Message,
 	GuildMember,
 	TextChannel,
 	User,
