@@ -8,6 +8,7 @@ import Cooldowns from "./util/Cooldowns";
 import DefaultCommands from "./util/DefaultCommands";
 import FeaturesHandler from "./util/FeaturesHandler";
 import { Logger } from "./logger/structures/Logger";
+import SubcommandHandler from "./subcommand-handler/SubcommandHandler";
 
 export const logger = new Logger();
 
@@ -20,6 +21,7 @@ class SWAGCommands {
 	private _disabledDefaultCommands!: DefaultCommands[];
 	private _validations!: Validations;
 	private _commandHandler: CommandHandler | undefined;
+	private _subcommandHandler: SubcommandHandler | undefined;
 	private _eventHandler!: EventHandler;
 	private _isConnectedToDB = false;
 
@@ -32,6 +34,7 @@ class SWAGCommands {
 			client,
 			mongoUri,
 			commandsDir,
+			subcommandsDir,
 			featuresDir,
 			defaultPrefix = "!",
 			testServers = [],
@@ -81,6 +84,14 @@ class SWAGCommands {
 			);
 		}
 
+		if (subcommandsDir) {
+			this._subcommandHandler = new SubcommandHandler(
+				(this as unknown) as SWAG,
+				subcommandsDir,
+				client
+			);
+		}
+
 		if (featuresDir) {
 			new FeaturesHandler((this as unknown) as SWAG, featuresDir, client);
 		}
@@ -118,6 +129,10 @@ class SWAGCommands {
 
 	public get commandHandler(): CommandHandler | undefined {
 		return this._commandHandler;
+	}
+
+	public get subcommandHandler(): SubcommandHandler | undefined {
+		return this._subcommandHandler;
 	}
 
 	public get eventHandler(): EventHandler {
