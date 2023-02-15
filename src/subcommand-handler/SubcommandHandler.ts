@@ -102,7 +102,7 @@ class CommandHandler {
 				optionDatas
 			);
 
-			const { description, testOnly, delete: del, deferReply } = commandObject;
+			const { description, testOnly, delete: del } = commandObject;
 
 			if (del) {
 				if (testOnly) {

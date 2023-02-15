@@ -40,7 +40,7 @@ export default async (interaction: CommandInteraction, instance: SWAG) => {
 		return;
 	}
 
-	const { deferReply } = command.commandObject;
+	const deferReply = subcommand.optionObject.deferReply;
 
 	if (deferReply) {
 		await interaction.deferReply({

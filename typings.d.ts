@@ -163,7 +163,6 @@ export class Command {
 export interface SubcommandObject {
 	description: string;
 	testOnly?: boolean;
-	deferReply?: "ephemeral" | boolean;
 	guildOnly?: boolean;
 	ownerOnly?: boolean;
 	delete?: boolean;
@@ -177,6 +176,7 @@ export interface SubcommandOptionObject {
 	ownerOnly?: boolean;
 	permissions?: bigint[];
 	cooldowns?: CooldownUsage;
+	deferReply?: "ephemeral" | boolean;
 	options?: ApplicationCommandOption[];
 	autocomplete?: function;
 	reply?: boolean;
