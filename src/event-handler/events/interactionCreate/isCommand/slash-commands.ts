@@ -3,6 +3,7 @@ import { CommandInteraction } from "discord.js";
 import SWAG from "../../../../../typings";
 
 export default async (interaction: CommandInteraction, instance: SWAG) => {
+	if(!interaction.isCommand()) return;
 	const { commandHandler } = instance;
 	if (!commandHandler) {
 		return;

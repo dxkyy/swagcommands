@@ -4,6 +4,7 @@ import SWAG from "../../../../../typings";
 import SubommandHandler from "../../../../subcommand-handler/SubcommandHandler";
 
 export default async (interaction: CommandInteraction, instance: SWAG) => {
+	if (!interaction.isCommand()) return;
 	const { subcommandHandler } = instance as {
 		subcommandHandler: SubommandHandler;
 	};
@@ -13,6 +14,12 @@ export default async (interaction: CommandInteraction, instance: SWAG) => {
 	}
 
 	const { commands } = subcommandHandler;
+
+	const command = commands.get(interaction.commandName);
+
+	if (!command) {
+		return;
+	}
 
 	let args = interaction.options.data[0].options?.map(({ value }) => {
 		return String(value);
@@ -24,12 +31,6 @@ export default async (interaction: CommandInteraction, instance: SWAG) => {
 				return String(value);
 			});
 		}
-	}
-
-	const command = commands.get(interaction.commandName);
-
-	if (!command) {
-		return;
 	}
 
 	const subcommand = command.options.find((option) => {
