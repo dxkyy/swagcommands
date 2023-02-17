@@ -23,6 +23,7 @@ export default class SWAG {
 	private _disabledDefaultCommands!: DefaultCommands[];
 	private _validations!: Validations;
 	private _commandHandler: CommandHandler | undefined;
+	private _subcommandHandler: SubcommandHandler | undefined;
 	private _eventHandler!: EventHandler;
 	private _isConnectedToDB = false;
 
@@ -36,6 +37,7 @@ export default class SWAG {
 	public get disabledDefaultCommands(): DefaultCommands[];
 	public get validations(): Validations;
 	public get commandHandler(): CommandHandler;
+	public get subcommandHandler(): SubcommandHandler;
 	public get eventHandler(): EventHandler;
 	public get isConnectedToDB(): boolean;
 }
@@ -44,6 +46,7 @@ export interface Options {
 	client: Client;
 	mongoUri?: string;
 	commandsDir?: string;
+	subcommandsDir?: string;
 	featuresDir?: string;
 	defaultPrefix?: string;
 	testServers?: string[];
@@ -104,6 +107,20 @@ export interface CommandUsage {
 	updateCooldown?: function;
 }
 
+export interface SubCommandUsage {
+	client: Client;
+	instance: SWAG;
+	interaction?: CommandInteraction;
+	args: string[];
+	text: string;
+	guild?: Guild | null;
+	member?: GuildMember;
+	user: User;
+	channel?: TextChannel;
+	cancelCooldown?: function;
+	updateCooldown?: function;
+}
+
 export interface CommandObject {
 	callback: (commandUsage: CommandUsage) => unknown;
 	type: CommandType;
@@ -141,6 +158,28 @@ export class Command {
 	public get instance(): SWAG;
 	public get commandName(): string;
 	public get commandObject(): CommandObject;
+}
+
+export interface SubcommandObject {
+	description: string;
+	testOnly?: boolean;
+	guildOnly?: boolean;
+	ownerOnly?: boolean;
+	delete?: boolean;
+}
+
+export interface SubcommandOptionObject {
+	callback: (commandUsage: SubCommandUsage) => unknown;
+	init?: function;
+	name: string;
+	description?: string;
+	ownerOnly?: boolean;
+	permissions?: bigint[];
+	cooldowns?: CooldownUsage;
+	deferReply?: "ephemeral" | boolean;
+	options?: ApplicationCommandOption[];
+	autocomplete?: function;
+	reply?: boolean;
 }
 
 export { CommandObject, Command, CommandType, CooldownTypes, DefaultCommands };
