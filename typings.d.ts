@@ -10,7 +10,6 @@ import {
 } from "discord.js";
 
 import CommandType from "./src/util/CommandType";
-import CooldownTypes from "./src/util/CooldownTypes";
 import Cooldowns from "./src/util/Cooldowns";
 import DefaultCommands from "./src/util/DefaultCommands";
 
@@ -75,6 +74,13 @@ export interface Validations {
 
 export class Cooldowns {
 	constructor(instance: SWAG, oldownConfig: CooldownConfig) {}
+}
+
+export enum CooldownTypes {
+	perUser = "perUser",
+	perUserPerGuild = "perUserPerGuild",
+	perGuild = "perGuild",
+	global = "global",
 }
 
 export interface CooldownUsage {
