@@ -18,7 +18,7 @@
 	"dependencies": {
 		"colorette": "^2.0.19",
 		"discord.js": "^14.7.1",
-		"mongoose": "^6.8.3",
+		"mongoose": "^7.0.1",
 		"swagcommands": "^1.0.9"
 	},
 	"repository": {
