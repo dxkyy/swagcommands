@@ -18,9 +18,20 @@ export default async (interaction: AutocompleteInteraction, instance: SWAG) => {
 		}
 	}
 
-	const { autocomplete } = command.commandObject;
+	let { autocomplete } = command.commandObject;
 	if (!autocomplete) {
-		return;
+		const subcommand = command.options.find((option: any) => {
+			return option.commandName === interaction.options.data[0].name;
+		});
+
+		if (!subcommand) {
+			return;
+		}
+
+		autocomplete = subcommand.optionObject.autocomplete;
+		if (!autocomplete) {
+			return;
+		}
 	}
 
 	const focusedOption = interaction.options.getFocused(true);
