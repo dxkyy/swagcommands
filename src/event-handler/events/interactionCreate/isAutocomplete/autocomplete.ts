@@ -3,15 +3,19 @@ import { AutocompleteInteraction } from "discord.js";
 import SWAG from "../../../../../typings";
 
 export default async (interaction: AutocompleteInteraction, instance: SWAG) => {
-	const { commandHandler } = instance;
+	const { commandHandler, subcommandHandler } = instance;
 	if (!commandHandler) {
 		return;
 	}
 
 	const { commands } = commandHandler;
-	const command = commands.get(interaction.commandName);
+	const subcommands = subcommandHandler.commands;
+	let command = commands.get(interaction.commandName);
 	if (!command) {
-		return;
+		command = subcommands.get(interaction.commandName);
+		if (!command) {
+			return;
+		}
 	}
 
 	const { autocomplete } = command.commandObject;
