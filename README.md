@@ -7,3 +7,9 @@ SWAGCommands is an easy-to-use Discord.JS command handler.
 ## Documentation
 
 > coming soon
+
+## Todo
+
+- [ ] Documentation
+
+- [ ] ContextMenu Handler
