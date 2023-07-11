@@ -1,5 +1,9 @@
 lockfileVersion: '6.0'
 
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
 dependencies:
   colorette:
     specifier: ^2.0.20
@@ -9,7 +13,7 @@ dependencies:
     version: 14.11.0
   mongoose:
     specifier: ^7.0.5
-    version: 7.3.1
+    version: 7.3.2
   swagcommands:
     specifier: ^1.1.4
     version: 1.1.4
@@ -1122,8 +1126,8 @@ packages:
       - supports-color
     dev: false
 
-  /mongoose@7.3.1:
-    resolution: {integrity: sha512-6289bmSIhvR8xMHsYe2/CuzN7wHK+2RHcK7idDdzniCPC5zix5JH0Hc4k3CmXlr/9zQ2250gUQiUWtvDB0vF1Q==}
+  /mongoose@7.3.2:
+    resolution: {integrity: sha512-Z86m5ASwYYFyT++wPQTtuTl5Jh052w6G1IM8LxPu/6iuqxQo6nUOaEoGZfMy0ovw3Dyw3415Jue3pYXkRqPkfA==}
     engines: {node: '>=14.20.1'}
     dependencies:
       bson: 5.3.0
