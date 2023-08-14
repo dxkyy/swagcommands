@@ -13,7 +13,7 @@ dependencies:
     version: 14.12.1
   mongoose:
     specifier: ^7.0.5
-    version: 7.4.2
+    version: 7.4.3
   swagcommands:
     specifier: ^1.1.4
     version: 1.1.4
@@ -1187,8 +1187,8 @@ packages:
       - supports-color
     dev: false
 
-  /mongoose@7.4.2:
-    resolution: {integrity: sha512-sNolW2hyncwvWmZjIEIwAckjaSKtC1SE86zE1v2TKm3vPTRogZfBQf+3zLYYdrgrVTzoaoICieVpct9hjcn3EQ==}
+  /mongoose@7.4.3:
+    resolution: {integrity: sha512-eok0lW6mZJHK2vVSWyJb9tUfPMUuRF3h7YC4pU2K2/YSZBlNDUwvKsHgftMOANbokP2Ry+4ylvzAdW4KjkRFjw==}
     engines: {node: '>=14.20.1'}
     dependencies:
       bson: 5.4.0
