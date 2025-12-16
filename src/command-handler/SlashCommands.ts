@@ -76,7 +76,7 @@ class SlashCommands {
 
 				await commands.edit(existingCommand.id, {
 					description,
-					options,
+					options: options as any,
 				});
 			}
 			return;
@@ -85,7 +85,7 @@ class SlashCommands {
 		await commands.create({
 			name,
 			description,
-			options,
+			options: options as any,
 		});
 	}
 

@@ -1,4 +1,4 @@
-import { PermissionFlagsBits } from "discord.js";
+import { MessageFlags, PermissionFlagsBits } from "discord.js";
 
 import CommandType from "../../util/CommandType";
 import { CommandObject, CommandUsage } from "../../../typings";
@@ -22,7 +22,7 @@ export default {
 			return {
 				content:
 					"This bot is not connected to a database which is required for this command. Please contact the bot owner.",
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
@@ -30,7 +30,7 @@ export default {
 
 		return {
 			content: `Set \`${prefix}\` as the command prefix for this server.`,
-			ephemeral: true,
+			flags: MessageFlags.Ephemeral,
 		};
 	},
 } as CommandObject;

@@ -1,4 +1,8 @@
-import { PermissionFlagsBits, ApplicationCommandOptionType } from "discord.js";
+import {
+	PermissionFlagsBits,
+	ApplicationCommandOptionType,
+	MessageFlags,
+} from "discord.js";
 
 import Command from "../Command";
 import CommandType from "../../util/CommandType";
@@ -33,7 +37,7 @@ export default {
 			return {
 				content:
 					"This bot is not connected to a database which is required for this command. Please contact the bot owner.",
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
@@ -44,14 +48,14 @@ export default {
 
 			return {
 				content: `Command \`${commandName}\` has been enabled`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		} else {
 			await disabledCommands.disable(guild!.id, commandName);
 
 			return {
 				content: `Command \`${commandName}\` has been disabled`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 	},

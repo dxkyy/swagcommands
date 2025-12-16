@@ -1,9 +1,17 @@
-import { ApplicationCommandOptionType, CommandInteraction } from "discord.js";
+import {
+	ApplicationCommandOptionType,
+	ChatInputCommandInteraction,
+	CommandInteraction,
+	MessageFlags,
+} from "discord.js";
 
 import SWAG from "../../../../../typings";
 import SubommandHandler from "../../../../subcommand-handler/SubcommandHandler";
 
-export default async (interaction: CommandInteraction, instance: SWAG) => {
+export default async (
+	interaction: ChatInputCommandInteraction,
+	instance: SWAG
+) => {
 	if (!interaction.isCommand()) return;
 	const { subcommandHandler } = instance as {
 		subcommandHandler: SubommandHandler;
@@ -45,7 +53,7 @@ export default async (interaction: CommandInteraction, instance: SWAG) => {
 
 	if (deferReply) {
 		await interaction.deferReply({
-			ephemeral: deferReply === "ephemeral",
+			flags: deferReply === "ephemeral" ? MessageFlags.Ephemeral : undefined,
 		});
 	}
 

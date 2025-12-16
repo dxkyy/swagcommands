@@ -106,7 +106,7 @@ class SubSlashCommands {
 
 				await commands.edit(existingCommand.id, {
 					description,
-					options: actualOptions,
+					options: actualOptions as any,
 				});
 			}
 			return;
@@ -115,7 +115,7 @@ class SubSlashCommands {
 		await commands.create({
 			name,
 			description,
-			options: actualOptions,
+			options: actualOptions as any,
 		});
 	}
 

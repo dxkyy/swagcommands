@@ -14,7 +14,7 @@ export default async (command: Command, usage: CommandUsage) => {
 	) {
 		const text = "This command has been disabled by an administrator.";
 
-		if (message) message.channel.send(text);
+		if (message && message.channel.isSendable()) message.channel.send(text);
 		else if (interaction) interaction.reply(text);
 
 		return false;

@@ -2,6 +2,7 @@ import {
 	ApplicationCommandOptionType,
 	AutocompleteInteraction,
 	ChatInputCommandInteraction,
+	MessageFlags,
 	PermissionFlagsBits,
 } from "discord.js";
 
@@ -85,7 +86,7 @@ export default {
 			return {
 				content:
 					"This bot is not connected to a database which is required for this command. Please contact the bot owner.",
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
@@ -105,7 +106,7 @@ export default {
 
 			return {
 				content: `Custom command \`${commandName}\` has been created!`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		} else if (sub === "delete") {
 			const commandName = interaction.options.getString("command");
@@ -113,7 +114,7 @@ export default {
 			if (commandName === noCommands) {
 				return {
 					content: "There are no custom commands to delete.",
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 				};
 			}
 
@@ -124,7 +125,7 @@ export default {
 
 			return {
 				content: `Custom command \`${commandName}\` has been deleted!`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 	},

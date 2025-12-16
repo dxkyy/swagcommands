@@ -112,7 +112,8 @@ class CustomCommands {
 			return;
 		}
 
-		if (message) message.channel.send(response).catch(() => {});
+		if (message && message.channel.isSendable())
+			message.channel.send(response).catch(() => {});
 		else if (interaction) interaction.reply(response).catch(() => {});
 	}
 }

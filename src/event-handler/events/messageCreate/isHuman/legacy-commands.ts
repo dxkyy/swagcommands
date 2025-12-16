@@ -13,7 +13,7 @@ export default async (message: Message, instance: SWAG) => {
 	const { prefixHandler, commands, customCommands } = commandHandler;
 
 	const prefix = prefixHandler.get(guild?.id);
-	if (!content.startsWith(prefix)) {
+	if (!content.startsWith(prefix) || !message.channel.isSendable()) {
 		return;
 	}
 

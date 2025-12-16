@@ -1,4 +1,8 @@
-import { ApplicationCommandOptionType, CommandInteraction } from "discord.js";
+import {
+	ApplicationCommandOptionType,
+	CommandInteraction,
+	MessageFlags,
+} from "discord.js";
 
 import Command from "../Command";
 import CommandType from "../../util/CommandType";
@@ -37,7 +41,7 @@ export default {
 			return {
 				content:
 					"This bot is not connected to a database which is required for this command. Please contact the bot owner.",
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
@@ -54,7 +58,7 @@ export default {
 		if (!command) {
 			return {
 				content: `The command \`${commandName}\` does not exist.`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
@@ -83,13 +87,13 @@ export default {
 			const channelNames = availableChannels.map((c: string) => `<#${c}> `);
 			return {
 				content: `The command \`${commandName}\` is now restricted to the following channels: ${channelNames}.`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
 		return {
 			content: `The command \`${commandName}\` is now available to be executed in any channel.`,
-			ephemeral: true,
+			flags: MessageFlags.Ephemeral,
 		};
 	},
 } as CommandObject;

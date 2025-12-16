@@ -1,4 +1,8 @@
-import { PermissionFlagsBits, ApplicationCommandOptionType } from "discord.js";
+import {
+	PermissionFlagsBits,
+	ApplicationCommandOptionType,
+	MessageFlags,
+} from "discord.js";
 
 import requiredroles from "../../models/required-roles-schema";
 import CommandType from "../../util/CommandType";
@@ -40,7 +44,7 @@ export default {
 			return {
 				content:
 					"This bot is not connected to a database which is required for this command. Please contact the bot owner.",
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
@@ -50,7 +54,7 @@ export default {
 		if (!command) {
 			return {
 				content: `The command \`${commandName}\` does not exist.`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
@@ -66,7 +70,7 @@ export default {
 
 			return {
 				content: `Here are the roles for \`${commandName}\`: ${roles}`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 				allowedMentions: {
 					roles: [],
 				},
@@ -95,7 +99,7 @@ export default {
 
 			return {
 				content: `The command \`${commandName}\` no longer requires the role <@&${role}> .`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 				allowedMentions: {
 					roles: [],
 				},
@@ -119,7 +123,7 @@ export default {
 
 		return {
 			content: `The command \`${commandName}\` now requires the role <@&${role}> .`,
-			ephemeral: true,
+			flags: MessageFlags.Ephemeral,
 			allowedMentions: {
 				roles: [],
 			},

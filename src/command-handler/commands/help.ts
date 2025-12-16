@@ -1,4 +1,8 @@
-import { ApplicationCommandOptionType, EmbedBuilder } from "discord.js";
+import {
+	ApplicationCommandOptionType,
+	EmbedBuilder,
+	MessageFlags,
+} from "discord.js";
 import CommandType from "../../util/CommandType";
 
 import { CommandObject } from "../../../typings";
@@ -55,7 +59,7 @@ export default {
 			} else {
 				return {
 					content: `The command \`${name}\` does not exist.`,
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 				};
 			}
 		}

@@ -1,4 +1,8 @@
-import { PermissionFlagsBits, ApplicationCommandOptionType } from "discord.js";
+import {
+	PermissionFlagsBits,
+	ApplicationCommandOptionType,
+	MessageFlags,
+} from "discord.js";
 
 import requiredPermissions from "../../models/required-permissions-schema";
 import CommandType from "../../util/CommandType";
@@ -47,7 +51,7 @@ export default {
 			return {
 				content:
 					"This bot is not connected to a database which is required for this command. Please contact the bot owner.",
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
@@ -57,7 +61,7 @@ export default {
 		if (!command) {
 			return {
 				content: `The command \`${commandName}\` does not exist.`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
@@ -73,7 +77,7 @@ export default {
 
 			return {
 				content: `Here are the permission(s) for \`${commandName}\`: ${permissions}`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
@@ -82,7 +86,7 @@ export default {
 
 			return {
 				content: `The command \`${commandName}\` no longer requires any permissions.`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
@@ -108,7 +112,7 @@ export default {
 
 			return {
 				content: `The command \`${commandName}\` no longer requires the permission \`${permission}\` to be executed.`,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			};
 		}
 
@@ -129,7 +133,7 @@ export default {
 
 		return {
 			content: `The command \`${commandName}\` now requires the permission \`${permission}\` to be executed.`,
-			ephemeral: true,
+			flags: MessageFlags.Ephemeral,
 		};
 	},
 } as CommandObject;
