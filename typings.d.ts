@@ -40,7 +40,6 @@ export default class SWAG {
 
 export interface Options {
   client: Client;
-  mongoUri?: string;
   commandsDir?: string;
   subcommandsDir?: string;
   featuresDir?: string;

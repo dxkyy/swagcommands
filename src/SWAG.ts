@@ -1,5 +1,4 @@
 import { Client } from "discord.js";
-import mongoose from "mongoose";
 
 import CommandHandler from "./command-handler/CommandHandler";
 import EventHandler from "./event-handler/EventHandler";
@@ -30,7 +29,6 @@ class SWAGCommands {
   private async init(options: Options) {
     let {
       client,
-      mongoUri,
       commandsDir,
       subcommandsDir,
       featuresDir,
@@ -44,10 +42,6 @@ class SWAGCommands {
 
     if (!client) {
       throw new Error("A client is required.");
-    }
-
-    if (mongoUri) {
-      await this.connectToMongo(mongoUri);
     }
 
     // Add the bot owner's ID
@@ -131,14 +125,6 @@ class SWAGCommands {
 
   public get isConnectedToDB(): boolean {
     return this._isConnectedToDB;
-  }
-
-  private async connectToMongo(mongoUri: string) {
-    await mongoose.connect(mongoUri, {
-      keepAlive: true,
-    });
-
-    this._isConnectedToDB = true;
   }
 }
 
