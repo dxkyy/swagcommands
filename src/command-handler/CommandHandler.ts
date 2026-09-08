@@ -10,7 +10,6 @@ import path from "path";
 import getAllFiles from "../util/get-all-files";
 import Command from "./Command";
 import SlashCommands from "./SlashCommands";
-import DisabledCommands from "./DisabledCommands";
 import PrefixHandler from "./PrefixHandler";
 import CommandType from "../util/CommandType";
 import SWAG, { CommandObject, CommandUsage } from "../../typings";
@@ -26,7 +25,6 @@ class CommandHandler {
   private _client: Client;
   private _commandsDir: string;
   private _slashCommands: SlashCommands;
-  private _disabledCommands: DisabledCommands;
   private _prefixes: PrefixHandler;
 
   constructor(instance: SWAG, commandsDir: string, client: Client) {
@@ -34,7 +32,6 @@ class CommandHandler {
     this._commandsDir = commandsDir;
     this._slashCommands = new SlashCommands(client);
     this._client = client;
-    this._disabledCommands = new DisabledCommands(instance);
     this._prefixes = new PrefixHandler(instance);
 
     this._validations = [
@@ -51,10 +48,6 @@ class CommandHandler {
 
   public get slashCommands() {
     return this._slashCommands;
-  }
-
-  public get disabledCommands() {
-    return this._disabledCommands;
   }
 
   public get prefixHandler() {
