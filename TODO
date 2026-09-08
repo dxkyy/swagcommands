@@ -5,4 +5,10 @@
 - [ ] remove mongodb
 	- [ ] remove default commands
 	- [ ] provide listCommands() -> array of command objects with name, description, etc.
-- [ ] preconditions
+	- [ ] also add some other form of changing prefixes / guild prefixes
+- [ ] preconditions (support for user written preconditions like in sapphire)
+- [ ] awaited initialization / ready promise
+- [ ] central interaction response handling
+- [ ] generated typescript declarations
+- [ ] explicit slash-command deployment/synchronization
+- [ ] structured error handling
