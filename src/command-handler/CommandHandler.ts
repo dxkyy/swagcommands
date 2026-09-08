@@ -10,7 +10,6 @@ import path from "path";
 import getAllFiles from "../util/get-all-files";
 import Command from "./Command";
 import SlashCommands from "./SlashCommands";
-import CustomCommands from "./CustomCommands";
 import DisabledCommands from "./DisabledCommands";
 import PrefixHandler from "./PrefixHandler";
 import CommandType from "../util/CommandType";
@@ -27,7 +26,6 @@ class CommandHandler {
   private _client: Client;
   private _commandsDir: string;
   private _slashCommands: SlashCommands;
-  private _customCommands: CustomCommands;
   private _disabledCommands: DisabledCommands;
   private _prefixes: PrefixHandler;
 
@@ -36,7 +34,6 @@ class CommandHandler {
     this._commandsDir = commandsDir;
     this._slashCommands = new SlashCommands(client);
     this._client = client;
-    this._customCommands = new CustomCommands(instance, this);
     this._disabledCommands = new DisabledCommands(instance);
     this._prefixes = new PrefixHandler(instance);
 
@@ -54,10 +51,6 @@ class CommandHandler {
 
   public get slashCommands() {
     return this._slashCommands;
-  }
-
-  public get customCommands() {
-    return this._customCommands;
   }
 
   public get disabledCommands() {
