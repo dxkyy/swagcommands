@@ -10,16 +10,24 @@ import {
 } from "discord.js";
 
 import CommandType from "./src/util/CommandType";
-import Cooldowns from "./src/util/Cooldowns";
-import DefaultCommands from "./src/util/DefaultCommands";
+
+type Awaitable<T> = T | Promise<T>;
+
+export interface PrefixStore {
+  getPrefix(guildId: string): Awaitable<string | undefined>;
+  setPrefix(guildId: string, prefix: string): Awaitable<void>;
+}
+
+export class MemoryPrefixStore implements PrefixStore {
+  getPrefix(guildId: string): string | undefined;
+  setPrefix(guildId: string, prefix: string): void;
+}
 
 export default class SWAG {
   private _client!: Client;
   private _defaultPrefix: string;
   private _testServers!: string[];
   private _botOwners!: string[];
-  private _cooldowns: Cooldowns | undefined;
-  private _disabledDefaultCommands!: DefaultCommands[];
   private _validations!: Validations;
   private _commandHandler: CommandHandler | undefined;
   private _subcommandHandler: SubcommandHandler | undefined;
@@ -32,34 +40,25 @@ export default class SWAG {
   public get defaultPrefix(): string;
   public get testServers(): string[];
   public get botOwners(): string[];
-  public get cooldowns(): Cooldowns;
-  public get disabledDefaultCommands(): DefaultCommands[];
   public get validations(): Validations;
   public get commandHandler(): CommandHandler;
   public get subcommandHandler(): SubcommandHandler;
   public get eventHandler(): EventHandler;
   public get isConnectedToDB(): boolean;
+  public get prefixStore(): PrefixStore;
 }
 
 export interface Options {
   client: Client;
-  mongoUri?: string;
   commandsDir?: string;
   subcommandsDir?: string;
   featuresDir?: string;
   defaultPrefix?: string;
   testServers?: string[];
   botOwners?: string[];
-  cooldownConfig?: CooldownConfig;
-  disabledDefaultCommands?: DefaultCommands[];
   events?: Events;
   validations?: Validations;
-}
-
-export interface CooldownConfig {
-  errorMessage: string;
-  botOwnersBypass: boolean;
-  dbRequired: number;
+  prefixStore?: PrefixStore;
 }
 
 export interface Events {
@@ -70,32 +69,6 @@ export interface Events {
 export interface Validations {
   runtime?: string;
   syntax?: string;
-}
-
-export class Cooldowns {
-  constructor(instance: SWAG, oldownConfig: CooldownConfig) {}
-}
-
-export enum CooldownTypes {
-  perUser = "perUser",
-  perUserPerGuild = "perUserPerGuild",
-  perGuild = "perGuild",
-  global = "global",
-}
-
-export interface CooldownUsage {
-  errorMessage?: string;
-  type: CooldownTypes;
-  duration: string;
-}
-
-export interface InternalCooldownConfig {
-  cooldownType: CooldownTypes;
-  userId: string;
-  actionId: string;
-  guildId?: string;
-  duration?: string;
-  errorMessage?: string;
 }
 
 export interface CommandUsage {
@@ -109,8 +82,6 @@ export interface CommandUsage {
   member?: GuildMember;
   user: User;
   channel?: TextChannel;
-  cancelCooldown?: function;
-  updateCooldown?: function;
 }
 
 export interface SubCommandUsage {
@@ -123,8 +94,6 @@ export interface SubCommandUsage {
   member?: GuildMember;
   user: User;
   channel?: TextChannel;
-  cancelCooldown?: function;
-  updateCooldown?: function;
 }
 
 export interface CommandObject {
@@ -138,7 +107,6 @@ export interface CommandObject {
   ownerOnly?: boolean; // can be precondition
   permissions?: bigint[]; // can be precondition
   deferReply?: "ephemeral" | boolean;
-  cooldowns?: CooldownUsage; // can be precondition
   minArgs?: number;
   maxArgs?: number;
   correctSyntax?: string;
@@ -181,11 +149,10 @@ export interface SubcommandOptionObject {
   description?: string;
   ownerOnly?: boolean;
   permissions?: bigint[];
-  cooldowns?: CooldownUsage;
   deferReply?: "ephemeral" | boolean;
   options?: ApplicationCommandOption[];
   autocomplete?: function;
   reply?: boolean;
 }
 
-export { CommandObject, Command, CommandType, CooldownTypes, DefaultCommands };
+export { CommandObject, Command, CommandType };

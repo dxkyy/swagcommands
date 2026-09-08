@@ -1,159 +1,131 @@
 import { Client } from "discord.js";
-import mongoose from "mongoose";
 
 import CommandHandler from "./command-handler/CommandHandler";
 import EventHandler from "./event-handler/EventHandler";
 import SWAG, { Events, Options, Validations } from "../typings";
-import Cooldowns from "./util/Cooldowns";
-import DefaultCommands from "./util/DefaultCommands";
 import FeaturesHandler from "./util/FeaturesHandler";
 import { Logger } from "./logger/structures/Logger";
 import SubcommandHandler from "./subcommand-handler/SubcommandHandler";
+import { PrefixStore } from "./prefixes/PrefixStore";
+import { MemoryPrefixStore } from "./prefixes/MemoryPrefixStore";
 
 export const logger = new Logger();
 
 class SWAGCommands {
-	private _client!: Client;
-	private _defaultPrefix!: string;
-	private _testServers!: string[];
-	private _botOwners!: string[];
-	private _cooldowns: Cooldowns | undefined;
-	private _disabledDefaultCommands!: DefaultCommands[];
-	private _validations!: Validations;
-	private _commandHandler: CommandHandler | undefined;
-	private _subcommandHandler: SubcommandHandler | undefined;
-	private _eventHandler!: EventHandler;
-	private _isConnectedToDB = false;
+  private _client!: Client;
+  private _defaultPrefix!: string;
+  private _testServers!: string[];
+  private _botOwners!: string[];
+  private _validations!: Validations;
+  private _commandHandler: CommandHandler | undefined;
+  private _subcommandHandler: SubcommandHandler | undefined;
+  private _eventHandler!: EventHandler;
+  private _isConnectedToDB = false;
+  private _prefixStore: PrefixStore;
 
-	constructor(options: Options) {
-		this.init(options);
-	}
+  constructor(options: Options) {
+    this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
+    this.init(options);
+  }
 
-	private async init(options: Options) {
-		let {
-			client,
-			mongoUri,
-			commandsDir,
-			subcommandsDir,
-			featuresDir,
-			defaultPrefix = "!",
-			testServers = [],
-			botOwners = [],
-			cooldownConfig,
-			disabledDefaultCommands = [],
-			events = {},
-			validations = {},
-		} = options;
+  private async init(options: Options) {
+    let {
+      client,
+      commandsDir,
+      subcommandsDir,
+      featuresDir,
+      defaultPrefix = "!",
+      testServers = [],
+      botOwners = [],
+      events = {},
+      validations = {},
+    } = options;
 
-		if (!client) {
-			throw new Error("A client is required.");
-		}
+    if (!client) {
+      throw new Error("A client is required.");
+    }
 
-		if (mongoUri) {
-			await this.connectToMongo(mongoUri);
-		}
+    // Add the bot owner's ID
+    if (botOwners.length === 0) {
+      await client.application?.fetch();
+      const ownerId = client.application?.owner?.id;
+      if (ownerId && botOwners.indexOf(ownerId) === -1) {
+        botOwners.push(ownerId);
+      }
+    }
 
-		// Add the bot owner's ID
-		if (botOwners.length === 0) {
-			await client.application?.fetch();
-			const ownerId = client.application?.owner?.id;
-			if (ownerId && botOwners.indexOf(ownerId) === -1) {
-				botOwners.push(ownerId);
-			}
-		}
+    this._client = client;
+    this._defaultPrefix = defaultPrefix;
+    this._testServers = testServers;
+    this._botOwners = botOwners;
+    this._validations = validations;
 
-		this._client = client;
-		this._defaultPrefix = defaultPrefix;
-		this._testServers = testServers;
-		this._botOwners = botOwners;
-		this._disabledDefaultCommands = disabledDefaultCommands;
-		this._validations = validations;
+    if (commandsDir) {
+      this._commandHandler = new CommandHandler(
+        this as unknown as SWAG,
+        commandsDir,
+        client,
+      );
+    }
 
-		this._cooldowns = new Cooldowns((this as unknown) as SWAG, {
-			errorMessage: "Please wait {TIME} before doing that again.",
-			botOwnersBypass: false,
-			dbRequired: 300, // 5 minutes
-			...cooldownConfig,
-		});
+    if (subcommandsDir) {
+      this._subcommandHandler = new SubcommandHandler(
+        this as unknown as SWAG,
+        subcommandsDir,
+        client,
+      );
+    }
 
-		if (commandsDir) {
-			this._commandHandler = new CommandHandler(
-				(this as unknown) as SWAG,
-				commandsDir,
-				client
-			);
-		}
+    if (featuresDir) {
+      new FeaturesHandler(this as unknown as SWAG, featuresDir, client);
+    }
 
-		if (subcommandsDir) {
-			this._subcommandHandler = new SubcommandHandler(
-				(this as unknown) as SWAG,
-				subcommandsDir,
-				client
-			);
-		}
+    this._eventHandler = new EventHandler(
+      this as unknown as SWAG,
+      events as Events,
+      client,
+    );
+  }
 
-		if (featuresDir) {
-			new FeaturesHandler((this as unknown) as SWAG, featuresDir, client);
-		}
+  public get client(): Client {
+    return this._client;
+  }
 
-		this._eventHandler = new EventHandler(
-			(this as unknown) as SWAG,
-			events as Events,
-			client
-		);
-	}
+  public get defaultPrefix(): string {
+    return this._defaultPrefix;
+  }
 
-	public get client(): Client {
-		return this._client;
-	}
+  public get testServers(): string[] {
+    return this._testServers;
+  }
 
-	public get defaultPrefix(): string {
-		return this._defaultPrefix;
-	}
+  public get botOwners(): string[] {
+    return this._botOwners;
+  }
 
-	public get testServers(): string[] {
-		return this._testServers;
-	}
+  public get commandHandler(): CommandHandler | undefined {
+    return this._commandHandler;
+  }
 
-	public get botOwners(): string[] {
-		return this._botOwners;
-	}
+  public get subcommandHandler(): SubcommandHandler | undefined {
+    return this._subcommandHandler;
+  }
 
-	public get cooldowns(): Cooldowns | undefined {
-		return this._cooldowns;
-	}
+  public get eventHandler(): EventHandler {
+    return this._eventHandler;
+  }
 
-	public get disabledDefaultCommands(): DefaultCommands[] {
-		return this._disabledDefaultCommands;
-	}
+  public get validations(): Validations {
+    return this._validations;
+  }
 
-	public get commandHandler(): CommandHandler | undefined {
-		return this._commandHandler;
-	}
+  public get isConnectedToDB(): boolean {
+    return this._isConnectedToDB;
+  }
 
-	public get subcommandHandler(): SubcommandHandler | undefined {
-		return this._subcommandHandler;
-	}
-
-	public get eventHandler(): EventHandler {
-		return this._eventHandler;
-	}
-
-	public get validations(): Validations {
-		return this._validations;
-	}
-
-	public get isConnectedToDB(): boolean {
-		return this._isConnectedToDB;
-	}
-
-	private async connectToMongo(mongoUri: string) {
-		await mongoose.connect(mongoUri, {
-			keepAlive: true,
-		});
-
-		this._isConnectedToDB = true;
-	}
+  public get prefixStore(): PrefixStore {
+    return this._prefixStore;
+  }
 }
 
 export default SWAGCommands;
