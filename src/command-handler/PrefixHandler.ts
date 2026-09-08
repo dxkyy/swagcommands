@@ -1,11 +1,6 @@
 import SWAG from "../../typings";
 
-/**
- * temporary implementation for removing mongodb
- * actual implementation with prefix stores will be added later
- */
 class PrefixHandler {
-  // <guildId: prefix>
   private _defaultPrefix = "!";
   private _instance: SWAG;
 
@@ -18,14 +13,19 @@ class PrefixHandler {
     return this._defaultPrefix;
   }
 
-  public get(guildId?: string) {
-    // TODO
-    return this.defaultPrefix;
+  public async get(guildId?: string): Promise<string> {
+    if (!guildId) {
+      return this.defaultPrefix;
+    }
+
+    return (
+      (await this._instance.prefixStore.getPrefix(guildId)) ??
+      this.defaultPrefix
+    );
   }
 
   public async set(guildId: string, prefix: string) {
-    // TODO
-    return;
+    await this._instance.prefixStore.setPrefix(guildId, prefix);
   }
 }
 

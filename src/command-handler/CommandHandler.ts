@@ -165,8 +165,9 @@ class CommandHandler {
       channel,
     };
 
+    const prefix = await this._prefixes.get(guild?.id);
     for (const validation of this._validations) {
-      if (!(await validation(command, usage, this._prefixes.get(guild?.id)))) {
+      if (!(await validation(command, usage, prefix))) {
         return;
       }
     }

@@ -6,6 +6,8 @@ import SWAG, { Events, Options, Validations } from "../typings";
 import FeaturesHandler from "./util/FeaturesHandler";
 import { Logger } from "./logger/structures/Logger";
 import SubcommandHandler from "./subcommand-handler/SubcommandHandler";
+import { PrefixStore } from "./prefixes/PrefixStore";
+import { MemoryPrefixStore } from "./prefixes/MemoryPrefixStore";
 
 export const logger = new Logger();
 
@@ -19,8 +21,10 @@ class SWAGCommands {
   private _subcommandHandler: SubcommandHandler | undefined;
   private _eventHandler!: EventHandler;
   private _isConnectedToDB = false;
+  private _prefixStore: PrefixStore;
 
   constructor(options: Options) {
+    this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
     this.init(options);
   }
 
@@ -117,6 +121,10 @@ class SWAGCommands {
 
   public get isConnectedToDB(): boolean {
     return this._isConnectedToDB;
+  }
+
+  public get prefixStore(): PrefixStore {
+    return this._prefixStore;
   }
 }
 

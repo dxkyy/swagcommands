@@ -11,6 +11,18 @@ import {
 
 import CommandType from "./src/util/CommandType";
 
+type Awaitable<T> = T | Promise<T>;
+
+export interface PrefixStore {
+  getPrefix(guildId: string): Awaitable<string | undefined>;
+  setPrefix(guildId: string, prefix: string): Awaitable<void>;
+}
+
+export class MemoryPrefixStore implements PrefixStore {
+  getPrefix(guildId: string): string | undefined;
+  setPrefix(guildId: string, prefix: string): void;
+}
+
 export default class SWAG {
   private _client!: Client;
   private _defaultPrefix: string;
@@ -33,6 +45,7 @@ export default class SWAG {
   public get subcommandHandler(): SubcommandHandler;
   public get eventHandler(): EventHandler;
   public get isConnectedToDB(): boolean;
+  public get prefixStore(): PrefixStore;
 }
 
 export interface Options {
@@ -45,6 +58,7 @@ export interface Options {
   botOwners?: string[];
   events?: Events;
   validations?: Validations;
+  prefixStore?: PrefixStore;
 }
 
 export interface Events {
