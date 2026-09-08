@@ -3,7 +3,6 @@ import { Client } from "discord.js";
 import CommandHandler from "./command-handler/CommandHandler";
 import EventHandler from "./event-handler/EventHandler";
 import SWAG, { Events, Options, Validations } from "../typings";
-import DefaultCommands from "./util/DefaultCommands";
 import FeaturesHandler from "./util/FeaturesHandler";
 import { Logger } from "./logger/structures/Logger";
 import SubcommandHandler from "./subcommand-handler/SubcommandHandler";
@@ -15,7 +14,6 @@ class SWAGCommands {
   private _defaultPrefix!: string;
   private _testServers!: string[];
   private _botOwners!: string[];
-  private _disabledDefaultCommands!: DefaultCommands[];
   private _validations!: Validations;
   private _commandHandler: CommandHandler | undefined;
   private _subcommandHandler: SubcommandHandler | undefined;
@@ -35,7 +33,6 @@ class SWAGCommands {
       defaultPrefix = "!",
       testServers = [],
       botOwners = [],
-      disabledDefaultCommands = [],
       events = {},
       validations = {},
     } = options;
@@ -57,7 +54,6 @@ class SWAGCommands {
     this._defaultPrefix = defaultPrefix;
     this._testServers = testServers;
     this._botOwners = botOwners;
-    this._disabledDefaultCommands = disabledDefaultCommands;
     this._validations = validations;
 
     if (commandsDir) {
@@ -101,10 +97,6 @@ class SWAGCommands {
 
   public get botOwners(): string[] {
     return this._botOwners;
-  }
-
-  public get disabledDefaultCommands(): DefaultCommands[] {
-    return this._disabledDefaultCommands;
   }
 
   public get commandHandler(): CommandHandler | undefined {

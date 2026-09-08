@@ -10,14 +10,12 @@ import {
 } from "discord.js";
 
 import CommandType from "./src/util/CommandType";
-import DefaultCommands from "./src/util/DefaultCommands";
 
 export default class SWAG {
   private _client!: Client;
   private _defaultPrefix: string;
   private _testServers!: string[];
   private _botOwners!: string[];
-  private _disabledDefaultCommands!: DefaultCommands[];
   private _validations!: Validations;
   private _commandHandler: CommandHandler | undefined;
   private _subcommandHandler: SubcommandHandler | undefined;
@@ -30,7 +28,6 @@ export default class SWAG {
   public get defaultPrefix(): string;
   public get testServers(): string[];
   public get botOwners(): string[];
-  public get disabledDefaultCommands(): DefaultCommands[];
   public get validations(): Validations;
   public get commandHandler(): CommandHandler;
   public get subcommandHandler(): SubcommandHandler;
@@ -46,7 +43,6 @@ export interface Options {
   defaultPrefix?: string;
   testServers?: string[];
   botOwners?: string[];
-  disabledDefaultCommands?: DefaultCommands[];
   events?: Events;
   validations?: Validations;
 }
@@ -145,4 +141,4 @@ export interface SubcommandOptionObject {
   reply?: boolean;
 }
 
-export { CommandObject, Command, CommandType, DefaultCommands };
+export { CommandObject, Command, CommandType };
