@@ -14,11 +14,7 @@ import CustomCommands from "./CustomCommands";
 import DisabledCommands from "./DisabledCommands";
 import PrefixHandler from "./PrefixHandler";
 import CommandType from "../util/CommandType";
-import SWAG, {
-  CommandObject,
-  CommandUsage,
-  InternalCooldownConfig,
-} from "../../typings";
+import SWAG, { CommandObject, CommandUsage } from "../../typings";
 import DefaultCommands from "../util/DefaultCommands";
 
 class CommandHandler {
@@ -170,7 +166,7 @@ class CommandHandler {
     message: Message | null,
     interaction: CommandInteraction | null,
   ) {
-    const { callback, type, cooldowns } = command.commandObject;
+    const { callback, type } = command.commandObject;
 
     if (message && type === CommandType.SLASH) {
       return;
@@ -202,33 +198,6 @@ class CommandHandler {
       if (!(await validation(command, usage, this._prefixes.get(guild?.id)))) {
         return;
       }
-    }
-
-    if (cooldowns) {
-      const cooldownUsage: InternalCooldownConfig = {
-        cooldownType: cooldowns.type,
-        userId: user!.id,
-        actionId: `command_${command.commandName}`,
-        guildId: guild?.id,
-        duration: cooldowns.duration,
-        errorMessage: cooldowns.errorMessage,
-      };
-
-      const result = this._instance.cooldowns?.canRunAction(cooldownUsage);
-
-      if (typeof result === "string") {
-        return result;
-      }
-
-      await this._instance.cooldowns?.start(cooldownUsage);
-
-      usage.cancelCooldown = () => {
-        this._instance.cooldowns?.cancelCooldown(cooldownUsage);
-      };
-
-      usage.updateCooldown = (expires: Date) => {
-        this._instance.cooldowns?.updateCooldown(cooldownUsage, expires);
-      };
     }
 
     return await callback(usage);
