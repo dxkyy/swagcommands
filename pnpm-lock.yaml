@@ -17,9 +17,6 @@ importers:
       mongoose:
         specifier: ^8.0.0
         version: 8.24.4
-      swagcommands:
-        specifier: ^1.1.5
-        version: 1.1.7
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -303,9 +300,6 @@ packages:
   sparse-bitfield@3.0.3:
     resolution: {integrity: sha512-kvzhi7vqKTfkh0PZU+2D2PIllw2ymqJKujUcyPMd9Y75Nv4nPbGJZXNhxsgdQab2BmlDct1YnfQCguEvHr7VsQ==}
 
-  swagcommands@1.1.7:
-    resolution: {integrity: sha512-tIJD2EQWQsQI8sYbT3DHz8eVCNkmBb8/Cva494mU+4LSfzcNpfEvh+PJDFQid+4EAKB3codeX1Z/7Wr1mUH15w==}
-
   tr46@5.1.1:
     resolution: {integrity: sha512-hdF5ZgjTqgAntKkklYw0R03MG2x/bSzTtkxmIRw/sTNV8YXsCJ1tfLAX23lhxhHJlEf3CRCOCGGWw3vI3GaSPw==}
     engines: {node: '>=18'}
@@ -576,23 +570,6 @@ snapshots:
   sparse-bitfield@3.0.3:
     dependencies:
       memory-pager: 1.5.0
-
-  swagcommands@1.1.7:
-    dependencies:
-      colorette: 2.0.20
-      discord.js: 14.27.0
-      mongoose: 8.24.4
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-providers'
-      - '@mongodb-js/zstd'
-      - bufferutil
-      - gcp-metadata
-      - kerberos
-      - mongodb-client-encryption
-      - snappy
-      - socks
-      - supports-color
-      - utf-8-validate
 
   tr46@5.1.1:
     dependencies:
