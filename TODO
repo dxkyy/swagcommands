@@ -1,0 +1,7 @@
+# v2 TODO:
+- [ ] update to latest discord js
+- [ ] Context Menu handler
+- [ ] Subcommands text message command support
+- [ ] remove mongodb
+	- [ ] remove default commands
+- [ ] preconditions
