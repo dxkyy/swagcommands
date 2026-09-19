@@ -8,6 +8,8 @@ import { Logger } from "./logger/structures/Logger";
 import SubcommandHandler from "./subcommand-handler/SubcommandHandler";
 import { PrefixStore } from "./prefixes/PrefixStore";
 import { MemoryPrefixStore } from "./prefixes/MemoryPrefixStore";
+import { InitializationError } from "./errors/InitializationError";
+import { ErrorContext, SwagError } from "./errors/SwagError";
 
 export const logger = new Logger();
 
@@ -67,7 +69,10 @@ class SWAGCommands {
       this._state = "ready";
     } catch (error) {
       this._state = "failed";
-      throw error;
+      if (error instanceof InitializationError) {
+        throw error;
+      }
+      throw new InitializationError(error);
     }
   }
 
@@ -188,6 +193,15 @@ class SWAGCommands {
 
   public isReady(): boolean {
     return this._state === "ready";
+  }
+
+  public async reportError(error: SwagError): Promise<void> {
+    if (this._options.onError) {
+      await this._options.onError(error, error.context as ErrorContext);
+      return;
+    }
+
+    logger.error(`[${error.code}] ${error.message}`, error.cause);
   }
 }
 

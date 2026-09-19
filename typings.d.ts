@@ -20,6 +20,58 @@ export type LifecycleState =
   | "failed"
   | "destroyed";
 
+export type ErrorPhase =
+  | "initialization"
+  | "validation"
+  | "execution"
+  | "response"
+  | "autocomplete"
+  | "event";
+
+export type InvocationKind = "message" | "interaction" | "autocomplete";
+
+export interface ErrorContext {
+  commandName?: string;
+  eventName?: string;
+  filePath?: string;
+  invocationKind?: InvocationKind;
+  subcommandName?: string;
+}
+
+export interface SwagErrorOptions {
+  cause?: unknown;
+  code: string;
+  context?: ErrorContext;
+  phase: ErrorPhase;
+}
+
+export class SwagError extends Error {
+  public readonly code: string;
+  public readonly context: Readonly<ErrorContext>;
+  public readonly phase: ErrorPhase;
+  public constructor(message: string, options: SwagErrorOptions);
+}
+
+export class InitializationError extends SwagError {
+  public constructor(cause: unknown, options?: { context?: ErrorContext });
+}
+
+export class ModuleLoadError extends SwagError {
+  public constructor(cause: unknown, context?: ErrorContext);
+}
+
+export class CommandDefinitionError extends SwagError {
+  public constructor(message: string, context?: ErrorContext);
+}
+
+export class CommandExecutionError extends SwagError {
+  public constructor(cause: unknown, context?: ErrorContext);
+}
+
+export class InteractionResponseError extends SwagError {
+  public constructor(cause: unknown, context?: ErrorContext);
+}
+
 export interface PrefixStore {
   getPrefix(guildId: string): Awaitable<string | undefined>;
   setPrefix(guildId: string, prefix: string): Awaitable<void>;
@@ -58,6 +110,7 @@ export default class SWAG {
   public get prefixStore(): PrefixStore;
   public get state(): LifecycleState;
   public isReady(): boolean;
+  public reportError(error: SwagError): Promise<void>;
 }
 
 export interface Options {
@@ -71,6 +124,7 @@ export interface Options {
   events?: Events;
   validations?: Validations;
   prefixStore?: PrefixStore;
+  onError?: (error: SwagError, context: ErrorContext) => Awaitable<void>;
 }
 
 export interface Events {

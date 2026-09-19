@@ -45,6 +45,7 @@ vi.mock("../src/event-handler/EventHandler", () => ({
 }));
 
 import SWAG from "../src/SWAG";
+import { InitializationError } from "../src/errors/InitializationError";
 
 type AsyncSWAGConstructor = typeof SWAG & {
   create(options: Record<string, unknown>): Promise<SWAG>;
@@ -136,7 +137,12 @@ describe("SWAG initialization", () => {
         client: createClient(),
         commandsDir: "/commands",
       }),
-    ).rejects.toThrow("command loading failed");
+    ).rejects.toMatchObject({
+      cause: failure,
+      code: "SWAG_INITIALIZATION_FAILED",
+      message: expect.stringContaining("command loading failed"),
+      phase: "initialization",
+    } satisfies Partial<InitializationError>);
 
     expect(lifecycle.eventRegister).not.toHaveBeenCalled();
   });
