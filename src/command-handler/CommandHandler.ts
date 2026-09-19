@@ -72,27 +72,10 @@ class CommandHandler {
 
       const command = new Command(this._instance, commandName, commandObject);
 
-      const {
-        description,
-        type,
-        testOnly,
-        delete: del,
-        aliases = [],
-        init = () => {},
-      } = commandObject;
+      const { delete: del, aliases = [], init = () => {} } = commandObject;
 
       // TODO: needs further inspection. removed disabledDefaultCommands check
       if (del) {
-        if (type === "SLASH" || type === "BOTH") {
-          if (testOnly) {
-            for (const guildId of this._instance.testServers) {
-              await this._slashCommands.delete(command.commandName, guildId);
-            }
-          } else {
-            await this._slashCommands.delete(command.commandName);
-          }
-        }
-
         continue;
       }
 
@@ -106,29 +89,6 @@ class CommandHandler {
 
       for (const name of names) {
         this._commands.set(name, command);
-      }
-
-      if (type === "SLASH" || type === "BOTH") {
-        const options =
-          commandObject.options ||
-          this._slashCommands.createOptions(commandObject);
-
-        if (testOnly) {
-          for (const guildId of this._instance.testServers) {
-            await this._slashCommands.create(
-              command.commandName,
-              description!,
-              options,
-              guildId,
-            );
-          }
-        } else {
-          await this._slashCommands.create(
-            command.commandName,
-            description!,
-            options,
-          );
-        }
       }
     }
   }

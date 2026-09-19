@@ -103,17 +103,9 @@ class CommandHandler {
         optionDatas,
       );
 
-      const { description, testOnly, delete: del } = commandObject;
+      const { delete: del } = commandObject;
 
       if (del) {
-        if (testOnly) {
-          for (const guildId of this._instance.testServers) {
-            await this._slashCommands.delete(command.commandName, guildId);
-          }
-        } else {
-          await this._slashCommands.delete(command.commandName);
-        }
-
         continue;
       }
 
@@ -126,23 +118,6 @@ class CommandHandler {
 
       for (const name of names) {
         this._subCommands.set(name, command);
-      }
-
-      if (testOnly) {
-        for (const guildId of this._instance.testServers) {
-          await this._slashCommands.create(
-            command.commandName,
-            description!,
-            optionDatas,
-            guildId,
-          );
-        }
-      } else {
-        await this._slashCommands.create(
-          command.commandName,
-          description!,
-          optionDatas,
-        );
       }
     }
   }

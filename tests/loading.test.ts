@@ -122,6 +122,43 @@ describe("explicit handler loading", () => {
     expect(feature).toHaveBeenCalledOnce();
   });
 
+  it("does not deploy slash commands while loading command definitions", async () => {
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          description: "A test command",
+          type: "SLASH",
+        },
+        filePath: "/commands/test.ts",
+      },
+    ]);
+    const applicationCommands = {
+      cache: {
+        find: vi.fn(),
+      },
+      create: vi.fn(),
+      fetch: vi.fn(),
+    };
+    const client = {
+      application: {
+        commands: applicationCommands,
+      },
+    };
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      client as never,
+    );
+
+    await handler.load();
+
+    expect(handler.commands.has("test")).toBe(true);
+    expect(applicationCommands.fetch).not.toHaveBeenCalled();
+    expect(applicationCommands.create).not.toHaveBeenCalled();
+    expect(applicationCommands.cache.find).not.toHaveBeenCalled();
+  });
+
   it("loads event definitions before registering listeners", async () => {
     const client = {
       on: vi.fn(),
