@@ -5,7 +5,10 @@
   "main": "./dist/index.js",
   "typings": "./typings.d.ts",
   "scripts": {
-    "compile": "tsc -w --outDir dist --rootDir src --skipLibCheck"
+    "compile": "tsc -w --outDir dist --rootDir src --skipLibCheck",
+    "test": "vitest run",
+    "test:typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test:watch": "vitest"
   },
   "keywords": [
     "discord",
@@ -24,6 +27,8 @@
     "url": "https://github.com/dxkyy/swagcommands"
   },
   "devDependencies": {
-    "typescript": "^7.0.2"
+    "@types/node": "^26.6.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
   }
 }
