@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, MessageFlags } from "discord.js";
+import { ChatInputCommandInteraction } from "discord.js";
 
 import SWAG from "../../../../../typings";
 
@@ -23,27 +23,10 @@ export default async (
     return;
   }
 
-  const { deferReply } = command.commandObject;
-
-  if (deferReply) {
-    await interaction.deferReply({
-      flags: deferReply === "ephemeral" ? MessageFlags.Ephemeral : undefined,
-    });
-  }
-
-  const response = await commandHandler.runCommand(
+  await commandHandler.runCommand(
     command,
     args,
     null,
     interaction,
   );
-  if (!response) {
-    return;
-  }
-
-  if (deferReply) {
-    interaction.editReply(response).catch(() => {});
-  } else {
-    interaction.reply(response).catch(() => {});
-  }
 };

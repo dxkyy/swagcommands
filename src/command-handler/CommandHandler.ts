@@ -1,9 +1,7 @@
 import {
   Client,
   CommandInteraction,
-  GuildMember,
   Message,
-  TextChannel,
 } from "discord.js";
 import path from "path";
 
@@ -11,34 +9,33 @@ import getAllFiles from "../util/get-all-files";
 import Command from "./Command";
 import SlashCommands from "./SlashCommands";
 import PrefixHandler from "./PrefixHandler";
-import CommandType from "../util/CommandType";
-import SWAG, { CommandObject, CommandUsage } from "../../typings";
+import SWAG, { CommandObject } from "../../typings";
+import CommandExecutor from "../execution/CommandExecutor";
 
 class CommandHandler {
   // <commandName, instance of the Command class>
   private _commands: Map<string, Command> = new Map();
-  private _validations = this.getValidations(
-    path.join(__dirname, "validations", "run-time"),
-  );
+  private _validations: any[] = [];
   private _instance: SWAG;
   private _client: Client;
   private _commandsDir: string;
   private _slashCommands: SlashCommands;
   private _prefixes: PrefixHandler;
+  private _loading: Promise<void> | undefined;
+  private _executor: CommandExecutor;
 
-  constructor(instance: SWAG, commandsDir: string, client: Client) {
+  constructor(
+    instance: SWAG,
+    commandsDir: string,
+    client: Client,
+    executor: CommandExecutor,
+  ) {
     this._instance = instance;
     this._commandsDir = commandsDir;
     this._slashCommands = new SlashCommands(client);
     this._client = client;
     this._prefixes = new PrefixHandler(instance);
-
-    this._validations = [
-      ...this._validations,
-      ...this.getValidations(instance.validations?.runtime),
-    ];
-
-    this.readFiles();
+    this._executor = executor;
   }
 
   public get commands() {
@@ -53,7 +50,17 @@ class CommandHandler {
     return this._prefixes;
   }
 
+  public load(): Promise<void> {
+    this._loading ??= this.readFiles();
+    return this._loading;
+  }
+
   private async readFiles() {
+    this._validations = [
+      ...this.getValidations(path.join(__dirname, "validations", "run-time")),
+      ...this.getValidations(this._instance.validations?.runtime),
+    ];
+
     const files = getAllFiles(this._commandsDir);
     const validations = [
       ...this.getValidations(path.join(__dirname, "validations", "syntax")),
@@ -70,27 +77,10 @@ class CommandHandler {
 
       const command = new Command(this._instance, commandName, commandObject);
 
-      const {
-        description,
-        type,
-        testOnly,
-        delete: del,
-        aliases = [],
-        init = () => {},
-      } = commandObject;
+      const { delete: del, aliases = [], init = () => {} } = commandObject;
 
       // TODO: needs further inspection. removed disabledDefaultCommands check
       if (del) {
-        if (type === "SLASH" || type === "BOTH") {
-          if (testOnly) {
-            for (const guildId of this._instance.testServers) {
-              this._slashCommands.delete(command.commandName, guildId);
-            }
-          } else {
-            this._slashCommands.delete(command.commandName);
-          }
-        }
-
         continue;
       }
 
@@ -105,29 +95,6 @@ class CommandHandler {
       for (const name of names) {
         this._commands.set(name, command);
       }
-
-      if (type === "SLASH" || type === "BOTH") {
-        const options =
-          commandObject.options ||
-          this._slashCommands.createOptions(commandObject);
-
-        if (testOnly) {
-          for (const guildId of this._instance.testServers) {
-            this._slashCommands.create(
-              command.commandName,
-              description!,
-              options,
-              guildId,
-            );
-          }
-        } else {
-          this._slashCommands.create(
-            command.commandName,
-            description!,
-            options,
-          );
-        }
-      }
     }
   }
 
@@ -136,43 +103,15 @@ class CommandHandler {
     args: string[],
     message: Message | null,
     interaction: CommandInteraction | null,
-  ) {
-    const { callback, type } = command.commandObject;
-
-    if (message && type === CommandType.SLASH) {
-      return;
-    }
-
-    const guild = message ? message.guild : interaction?.guild;
-    const member = (
-      message ? message.member : interaction?.member
-    ) as GuildMember;
-    const user = message ? message.author : interaction?.user;
-    const channel = (
-      message ? message.channel : interaction?.channel
-    ) as TextChannel;
-
-    const usage: CommandUsage = {
-      client: command.instance.client,
-      instance: command.instance,
+  ): Promise<void> {
+    await this._executor.executeCommand(
+      command,
+      args,
       message,
       interaction,
-      args,
-      text: args.join(" "),
-      guild,
-      member,
-      user: user!,
-      channel,
-    };
-
-    const prefix = await this._prefixes.get(guild?.id);
-    for (const validation of this._validations) {
-      if (!(await validation(command, usage, prefix))) {
-        return;
-      }
-    }
-
-    return await callback(usage);
+      this._validations,
+      this._prefixes,
+    );
   }
 
   private getValidations(folder?: string) {

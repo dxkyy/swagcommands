@@ -33,25 +33,10 @@ export default async (message: Message, instance: SWAG) => {
     return;
   }
 
-  const { reply, deferReply } = command.commandObject;
-
-  if (deferReply) {
-    message.channel.sendTyping();
-  }
-
-  const response = await commandHandler.runCommand(
+  await commandHandler.runCommand(
     command,
     args,
     message,
     null,
   );
-  if (!response) {
-    return;
-  }
-
-  if (reply) {
-    message.reply(response).catch(() => {});
-  } else {
-    message.channel.send(response).catch(() => {});
-  }
 };

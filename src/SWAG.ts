@@ -8,8 +8,19 @@ import { Logger } from "./logger/structures/Logger";
 import SubcommandHandler from "./subcommand-handler/SubcommandHandler";
 import { PrefixStore } from "./prefixes/PrefixStore";
 import { MemoryPrefixStore } from "./prefixes/MemoryPrefixStore";
+import { InitializationError } from "./errors/InitializationError";
+import { ErrorContext, SwagError } from "./errors/SwagError";
+import ResponseHandler from "./execution/ResponseHandler";
+import CommandExecutor from "./execution/CommandExecutor";
 
 export const logger = new Logger();
+
+export type LifecycleState =
+  | "idle"
+  | "initializing"
+  | "ready"
+  | "failed"
+  | "destroyed";
 
 class SWAGCommands {
   private _client!: Client;
@@ -22,13 +33,56 @@ class SWAGCommands {
   private _eventHandler!: EventHandler;
   private _isConnectedToDB = false;
   private _prefixStore: PrefixStore;
+  private _state: LifecycleState = "idle";
+  private _initialization: Promise<void> | undefined;
+  private readonly _options: Options;
+  private readonly _commandExecutor: CommandExecutor;
+  private readonly _responseHandler: ResponseHandler;
 
-  constructor(options: Options) {
+  private constructor(options: Options) {
+    this._options = {
+      ...options,
+      botOwners: options.botOwners ? [...options.botOwners] : undefined,
+      events: options.events ? { ...options.events } : undefined,
+      testServers: options.testServers ? [...options.testServers] : undefined,
+      validations: options.validations ? { ...options.validations } : undefined,
+    };
     this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
-    this.init(options);
+    this._responseHandler = new ResponseHandler(this);
+    this._commandExecutor = new CommandExecutor(this as unknown as SWAG);
   }
 
-  private async init(options: Options) {
+  public static async create(options: Options): Promise<SWAGCommands> {
+    if (!options) {
+      throw new Error("Options are required.");
+    }
+
+    const instance = new SWAGCommands(options);
+    await instance.initialize();
+    return instance;
+  }
+
+  private initialize(): Promise<void> {
+    this._initialization ??= this.performInitialization();
+    return this._initialization;
+  }
+
+  private async performInitialization(): Promise<void> {
+    this._state = "initializing";
+
+    try {
+      await this.init(this._options);
+      this._state = "ready";
+    } catch (error) {
+      this._state = "failed";
+      if (error instanceof InitializationError) {
+        throw error;
+      }
+      throw new InitializationError(error);
+    }
+  }
+
+  private async init(options: Options): Promise<void> {
     let {
       client,
       commandsDir,
@@ -40,6 +94,9 @@ class SWAGCommands {
       events = {},
       validations = {},
     } = options;
+
+    botOwners = [...botOwners];
+    testServers = [...testServers];
 
     if (!client) {
       throw new Error("A client is required.");
@@ -65,7 +122,9 @@ class SWAGCommands {
         this as unknown as SWAG,
         commandsDir,
         client,
+        this._commandExecutor,
       );
+      await this._commandHandler.load();
     }
 
     if (subcommandsDir) {
@@ -73,11 +132,18 @@ class SWAGCommands {
         this as unknown as SWAG,
         subcommandsDir,
         client,
+        this._commandExecutor,
       );
+      await this._subcommandHandler.load();
     }
 
     if (featuresDir) {
-      new FeaturesHandler(this as unknown as SWAG, featuresDir, client);
+      const featuresHandler = new FeaturesHandler(
+        this as unknown as SWAG,
+        featuresDir,
+        client,
+      );
+      await featuresHandler.load();
     }
 
     this._eventHandler = new EventHandler(
@@ -85,6 +151,8 @@ class SWAGCommands {
       events as Events,
       client,
     );
+    await this._eventHandler.load();
+    this._eventHandler.registerEvents();
   }
 
   public get client(): Client {
@@ -125,6 +193,27 @@ class SWAGCommands {
 
   public get prefixStore(): PrefixStore {
     return this._prefixStore;
+  }
+
+  public get state(): LifecycleState {
+    return this._state;
+  }
+
+  public isReady(): boolean {
+    return this._state === "ready";
+  }
+
+  public get responseHandler(): ResponseHandler {
+    return this._responseHandler;
+  }
+
+  public async reportError(error: SwagError): Promise<void> {
+    if (this._options.onError) {
+      await this._options.onError(error, error.context as ErrorContext);
+      return;
+    }
+
+    logger.error(`[${error.code}] ${error.message}`, error.cause);
   }
 }
 

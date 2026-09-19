@@ -1,7 +1,30 @@
 import { MemoryPrefixStore } from "./prefixes/MemoryPrefixStore";
 import SWAG from "./SWAG";
 import CommandType from "./util/CommandType";
+import { AutocompleteError } from "./errors/AutocompleteError";
+import { CommandDefinitionError } from "./errors/CommandDefinitionError";
+import { CommandExecutionError } from "./errors/CommandExecutionError";
+import { EventExecutionError } from "./errors/EventExecutionError";
+import { InitializationError } from "./errors/InitializationError";
+import { InteractionResponseError } from "./errors/InteractionResponseError";
+import { InteractionAlreadyAcknowledgedError } from "./errors/InteractionAlreadyAcknowledgedError";
+import { MessageResponseError } from "./errors/MessageResponseError";
+import { ModuleLoadError } from "./errors/ModuleLoadError";
+import { SwagError } from "./errors/SwagError";
+import ResponseHandler from "./execution/ResponseHandler";
 
 module.exports = SWAG;
 module.exports.CommandType = CommandType;
 module.exports.MemoryPrefixStore = MemoryPrefixStore;
+module.exports.AutocompleteError = AutocompleteError;
+module.exports.CommandDefinitionError = CommandDefinitionError;
+module.exports.CommandExecutionError = CommandExecutionError;
+module.exports.EventExecutionError = EventExecutionError;
+module.exports.InitializationError = InitializationError;
+module.exports.InteractionAlreadyAcknowledgedError =
+  InteractionAlreadyAcknowledgedError;
+module.exports.InteractionResponseError = InteractionResponseError;
+module.exports.MessageResponseError = MessageResponseError;
+module.exports.ModuleLoadError = ModuleLoadError;
+module.exports.ResponseHandler = ResponseHandler;
+module.exports.SwagError = SwagError;

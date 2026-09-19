@@ -3,6 +3,10 @@ import path from "path";
 
 import getAllFiles from "../util/get-all-files";
 import SWAG, { Events } from "../../typings";
+import { EventExecutionError } from "../errors/EventExecutionError";
+import { Logger } from "../logger/structures/Logger";
+
+const logger = new Logger();
 
 class EventHandler {
 	// <eventName, array of [function, dynamic validation functions]>
@@ -12,6 +16,8 @@ class EventHandler {
 	private _client: Client;
 	private _events: Events;
 	private _builtInEvents: any;
+	private _loading: Promise<void> | undefined;
+	private _registered = false;
 
 	constructor(instance: SWAG, events: Events, client: Client) {
 		this._instance = instance;
@@ -32,11 +38,14 @@ class EventHandler {
 			},
 		};
 
-		this.readFiles();
-		this.registerEvents();
 	}
 
-	async readFiles() {
+	public load(): Promise<void> {
+		this._loading ??= this.readFiles();
+		return this._loading;
+	}
+
+	private async readFiles() {
 		const defaultEvents = getAllFiles(path.join(__dirname, "events"), true);
 		const folders = this._eventsDir ? getAllFiles(this._eventsDir, true) : [];
 
@@ -71,18 +80,37 @@ class EventHandler {
 	}
 
 	registerEvents() {
+		if (this._registered) {
+			return;
+		}
+		this._registered = true;
+
 		const instance = this._instance;
 
 		for (const eventName of this._eventCallbacks.keys()) {
 			const functions = this._eventCallbacks.get(eventName);
 
-			this._client.on(eventName, async function() {
+			this._client.on(eventName, async (...args: unknown[]) => {
 				for (const [func, dynamicValidation] of functions) {
-					if (dynamicValidation && !(await dynamicValidation(...arguments))) {
-						continue;
-					}
+					try {
+						if (dynamicValidation && !(await dynamicValidation(...args))) {
+							continue;
+						}
 
-					func(...arguments, instance);
+						await func(...args, instance);
+					} catch (error) {
+						try {
+							await instance.reportError(
+								new EventExecutionError(error, { eventName }),
+							);
+						} catch (reportingError) {
+							logger.error(
+								`[SWAG_EVENT_ERROR_HANDLER_FAILED] Failed to report an error from event "${eventName}".`,
+								reportingError,
+							);
+						}
+						return;
+					}
 				}
 			});
 		}
