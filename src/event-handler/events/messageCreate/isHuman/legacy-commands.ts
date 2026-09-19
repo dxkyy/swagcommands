@@ -45,13 +45,12 @@ export default async (message: Message, instance: SWAG) => {
     message,
     null,
   );
-  if (!response) {
+  if (response === undefined) {
     return;
   }
 
-  if (reply) {
-    message.reply(response).catch(() => {});
-  } else {
-    message.channel.send(response).catch(() => {});
-  }
+  await instance.responseHandler.respondToMessage(message, response, reply === true, {
+    commandName: command.commandName,
+    invocationKind: "message",
+  });
 };

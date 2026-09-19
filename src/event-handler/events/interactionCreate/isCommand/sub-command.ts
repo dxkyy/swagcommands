@@ -2,7 +2,6 @@ import {
 	ApplicationCommandOptionType,
 	ChatInputCommandInteraction,
 	CommandInteraction,
-	MessageFlags,
 } from "discord.js";
 
 import SWAG from "../../../../../typings";
@@ -50,11 +49,21 @@ export default async (
 	}
 
 	const deferReply = subcommand.optionObject.deferReply;
+	const responseContext = {
+		commandName: command.commandName,
+		invocationKind: "interaction" as const,
+		subcommandName: subcommand.commandName,
+	};
 
-	if (deferReply) {
-		await interaction.deferReply({
-			flags: deferReply === "ephemeral" ? MessageFlags.Ephemeral : undefined,
-		});
+	if (
+		deferReply &&
+		!(await instance.responseHandler.defer(
+			interaction,
+			deferReply,
+			responseContext
+		))
+	) {
+		return;
 	}
 
 	const response = await subcommandHandler.runCommand(
@@ -62,13 +71,13 @@ export default async (
 		args!,
 		interaction
 	);
-	if (!response) {
+	if (response === undefined) {
 		return;
 	}
 
-	if (deferReply) {
-		interaction.editReply(response).catch(() => {});
-	} else {
-		interaction.reply(response).catch(() => {});
-	}
+	await instance.responseHandler.respondToInteraction(
+		interaction,
+		response,
+		responseContext
+	);
 };

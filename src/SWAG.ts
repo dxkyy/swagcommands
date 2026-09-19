@@ -10,6 +10,7 @@ import { PrefixStore } from "./prefixes/PrefixStore";
 import { MemoryPrefixStore } from "./prefixes/MemoryPrefixStore";
 import { InitializationError } from "./errors/InitializationError";
 import { ErrorContext, SwagError } from "./errors/SwagError";
+import ResponseHandler from "./execution/ResponseHandler";
 
 export const logger = new Logger();
 
@@ -34,6 +35,7 @@ class SWAGCommands {
   private _state: LifecycleState = "idle";
   private _initialization: Promise<void> | undefined;
   private readonly _options: Options;
+  private readonly _responseHandler: ResponseHandler;
 
   private constructor(options: Options) {
     this._options = {
@@ -44,6 +46,7 @@ class SWAGCommands {
       validations: options.validations ? { ...options.validations } : undefined,
     };
     this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
+    this._responseHandler = new ResponseHandler(this);
   }
 
   public static async create(options: Options): Promise<SWAGCommands> {
@@ -193,6 +196,10 @@ class SWAGCommands {
 
   public isReady(): boolean {
     return this._state === "ready";
+  }
+
+  public get responseHandler(): ResponseHandler {
+    return this._responseHandler;
   }
 
   public async reportError(error: SwagError): Promise<void> {

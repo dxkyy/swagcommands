@@ -7,10 +7,12 @@ export default (command: SubcommandOption) => {
 	if (
 		deferReply &&
 		typeof deferReply !== "boolean" &&
-		deferReply !== "ephemeral"
+		(typeof deferReply !== "object" ||
+			(deferReply.ephemeral !== undefined &&
+				typeof deferReply.ephemeral !== "boolean"))
 	) {
 		throw new Error(
-			`Command "${commandName}" does not have a valid value for "deferReply". Please use a boolean value or "ephemeral".`
+			`Command "${commandName}" does not have a valid value for "deferReply". Please use a boolean or an options object.`
 		);
 	}
 };

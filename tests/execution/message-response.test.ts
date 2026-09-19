@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { MessageResponseError } from "../../src/errors/MessageResponseError";
+import ResponseHandler from "../../src/execution/ResponseHandler";
 import handleLegacyCommand from "../../src/event-handler/events/messageCreate/isHuman/legacy-commands";
 
 const createMessage = () => ({
@@ -22,11 +24,14 @@ const createMessage = () => ({
 
 const createInstance = (response: unknown, reply = false) => {
   const command = {
+    commandName: "hello",
     commandObject: {
       reply,
     },
   };
   const runCommand = vi.fn().mockResolvedValue(response);
+  const reportError = vi.fn().mockResolvedValue(undefined);
+  const responseHandler = new ResponseHandler({ reportError });
 
   return {
     command,
@@ -38,7 +43,9 @@ const createInstance = (response: unknown, reply = false) => {
         },
         runCommand,
       },
+      responseHandler,
     },
+    reportError,
     runCommand,
   };
 };
@@ -87,5 +94,30 @@ describe("message command responses", () => {
 
     expect(message.reply).not.toHaveBeenCalled();
     expect(message.channel.send).not.toHaveBeenCalled();
+  });
+
+  it("reports channel response failures without changing the payload", async () => {
+    const failure = new Error("Missing access");
+    const response = {
+      content: "Hello world",
+      files: [{ attachment: Buffer.from("file") }],
+    };
+    const message = createMessage();
+    message.channel.send.mockRejectedValue(failure);
+    const { instance, reportError } = createInstance(response);
+
+    await handleLegacyCommand(message as never, instance as never);
+
+    expect(message.channel.send).toHaveBeenCalledWith(response);
+    expect(reportError).toHaveBeenCalledOnce();
+    expect(reportError.mock.calls[0][0]).toBeInstanceOf(MessageResponseError);
+    expect(reportError.mock.calls[0][0]).toMatchObject({
+      cause: failure,
+      code: "SWAG_MESSAGE_RESPONSE_FAILED",
+      context: {
+        commandName: "hello",
+        invocationKind: "message",
+      },
+    });
   });
 });

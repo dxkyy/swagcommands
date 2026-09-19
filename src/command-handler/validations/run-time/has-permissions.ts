@@ -31,8 +31,17 @@ export default async (command: Command, usage: CommandUsage) => {
 				'", "'
 			)}\``;
 
-			if (message) message.reply(text);
-			else if (interaction) interaction.reply(text);
+				if (message) {
+					await instance.responseHandler.respondToMessage(message, text, true, {
+						commandName: command.commandName,
+						invocationKind: "message",
+					});
+				} else if (interaction) {
+					await instance.responseHandler.respondToInteraction(interaction, text, {
+						commandName: command.commandName,
+						invocationKind: "interaction",
+					});
+				}
 
 			return false;
 		}

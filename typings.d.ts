@@ -5,7 +5,12 @@ import {
   Guild,
   Message,
   GuildMember,
+  InteractionEditReplyOptions,
+  InteractionReplyOptions,
   TextChannel,
+  MessageCreateOptions,
+  MessagePayload,
+  MessageReplyOptions,
   User,
 } from "discord.js";
 
@@ -72,6 +77,58 @@ export class InteractionResponseError extends SwagError {
   public constructor(cause: unknown, context?: ErrorContext);
 }
 
+export class InteractionAlreadyAcknowledgedError extends SwagError {
+  public constructor(context?: ErrorContext);
+}
+
+export class MessageResponseError extends SwagError {
+  public constructor(cause: unknown, context?: ErrorContext);
+}
+
+export interface DeferOptions {
+  ephemeral?: boolean;
+}
+
+export type DeferSetting = boolean | DeferOptions;
+
+export type InteractionResponse =
+  | string
+  | MessagePayload
+  | InteractionReplyOptions
+  | InteractionEditReplyOptions;
+
+export type MessageResponse =
+  | string
+  | MessagePayload
+  | MessageCreateOptions
+  | MessageReplyOptions;
+
+export type CommandResponse = InteractionResponse | MessageResponse;
+
+export interface ErrorReporter {
+  reportError(error: SwagError): Promise<void>;
+}
+
+export class ResponseHandler {
+  public constructor(reporter: ErrorReporter);
+  public defer(
+    interaction: CommandInteraction,
+    setting: DeferSetting,
+    context?: ErrorContext,
+  ): Promise<boolean>;
+  public respondToInteraction(
+    interaction: CommandInteraction,
+    response: InteractionResponse,
+    context?: ErrorContext,
+  ): Promise<boolean>;
+  public respondToMessage(
+    message: Message,
+    response: MessageResponse,
+    reply: boolean,
+    context?: ErrorContext,
+  ): Promise<boolean>;
+}
+
 export interface PrefixStore {
   getPrefix(guildId: string): Awaitable<string | undefined>;
   setPrefix(guildId: string, prefix: string): Awaitable<void>;
@@ -109,6 +166,7 @@ export default class SWAG {
   public get isConnectedToDB(): boolean;
   public get prefixStore(): PrefixStore;
   public get state(): LifecycleState;
+  public get responseHandler(): ResponseHandler;
   public isReady(): boolean;
   public reportError(error: SwagError): Promise<void>;
 }
@@ -163,7 +221,7 @@ export interface SubCommandUsage {
 }
 
 export interface CommandObject {
-  callback: (commandUsage: CommandUsage) => unknown;
+  callback: (commandUsage: CommandUsage) => Awaitable<CommandResponse | void>;
   type: CommandType;
   init?: function;
   description?: string;
@@ -172,7 +230,7 @@ export interface CommandObject {
   guildOnly?: boolean; // can be precondition
   ownerOnly?: boolean; // can be precondition
   permissions?: bigint[]; // can be precondition
-  deferReply?: "ephemeral" | boolean;
+  deferReply?: DeferSetting;
   minArgs?: number;
   maxArgs?: number;
   correctSyntax?: string;
@@ -209,13 +267,13 @@ export interface SubcommandObject {
 }
 
 export interface SubcommandOptionObject {
-  callback: (commandUsage: SubCommandUsage) => unknown;
+  callback: (commandUsage: SubCommandUsage) => Awaitable<CommandResponse | void>;
   init?: function;
   name: string;
   description?: string;
   ownerOnly?: boolean;
   permissions?: bigint[];
-  deferReply?: "ephemeral" | boolean;
+  deferReply?: DeferSetting;
   options?: ApplicationCommandOption[];
   autocomplete?: function;
   reply?: boolean;

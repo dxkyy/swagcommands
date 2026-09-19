@@ -1,6 +1,9 @@
 import { MessageFlags } from "discord.js";
 import { describe, expect, it, vi } from "vitest";
 
+import { InteractionAlreadyAcknowledgedError } from "../../src/errors/InteractionAlreadyAcknowledgedError";
+import { InteractionResponseError } from "../../src/errors/InteractionResponseError";
+import ResponseHandler from "../../src/execution/ResponseHandler";
 import handleSlashCommand from "../../src/event-handler/events/interactionCreate/isCommand/slash-commands";
 
 const createInteraction = () => ({
@@ -18,11 +21,14 @@ const createInteraction = () => ({
 
 const createInstance = (response: unknown, deferReply?: unknown) => {
   const command = {
+    commandName: "hello",
     commandObject: {
       deferReply,
     },
   };
   const runCommand = vi.fn().mockResolvedValue(response);
+  const reportError = vi.fn().mockResolvedValue(undefined);
+  const responseHandler = new ResponseHandler({ reportError });
 
   return {
     command,
@@ -31,7 +37,9 @@ const createInstance = (response: unknown, deferReply?: unknown) => {
         commands: new Map([["hello", command]]),
         runCommand,
       },
+      responseHandler,
     },
+    reportError,
     runCommand,
   };
 };
@@ -93,5 +101,41 @@ describe("interaction command responses", () => {
     expect(interaction.deferReply).toHaveBeenCalledWith({
       flags: MessageFlags.Ephemeral,
     });
+  });
+
+  it("reports Discord response failures with command context", async () => {
+    const failure = new Error("Unknown interaction");
+    const interaction = createInteraction();
+    interaction.reply.mockRejectedValue(failure);
+    const { instance, reportError } = createInstance({ content: "Hello" });
+
+    await handleSlashCommand(interaction as never, instance as never);
+
+    expect(reportError).toHaveBeenCalledOnce();
+    const error = reportError.mock.calls[0][0];
+    expect(error).toBeInstanceOf(InteractionResponseError);
+    expect(error).toMatchObject({
+      cause: failure,
+      code: "SWAG_INTERACTION_RESPONSE_FAILED",
+      context: {
+        commandName: "hello",
+        invocationKind: "interaction",
+      },
+      phase: "response",
+    });
+  });
+
+  it("reports an already acknowledged interaction instead of replying twice", async () => {
+    const interaction = createInteraction();
+    interaction.replied = true;
+    const { instance, reportError } = createInstance({ content: "Hello" });
+
+    await handleSlashCommand(interaction as never, instance as never);
+
+    expect(interaction.reply).not.toHaveBeenCalled();
+    expect(interaction.editReply).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledWith(
+      expect.any(InteractionAlreadyAcknowledgedError),
+    );
   });
 });
