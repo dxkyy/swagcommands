@@ -12,6 +12,8 @@ class EventHandler {
 	private _client: Client;
 	private _events: Events;
 	private _builtInEvents: any;
+	private _loading: Promise<void> | undefined;
+	private _registered = false;
 
 	constructor(instance: SWAG, events: Events, client: Client) {
 		this._instance = instance;
@@ -32,11 +34,14 @@ class EventHandler {
 			},
 		};
 
-		this.readFiles();
-		this.registerEvents();
 	}
 
-	async readFiles() {
+	public load(): Promise<void> {
+		this._loading ??= this.readFiles();
+		return this._loading;
+	}
+
+	private async readFiles() {
 		const defaultEvents = getAllFiles(path.join(__dirname, "events"), true);
 		const folders = this._eventsDir ? getAllFiles(this._eventsDir, true) : [];
 
@@ -71,6 +76,11 @@ class EventHandler {
 	}
 
 	registerEvents() {
+		if (this._registered) {
+			return;
+		}
+		this._registered = true;
+
 		const instance = this._instance;
 
 		for (const eventName of this._eventCallbacks.keys()) {

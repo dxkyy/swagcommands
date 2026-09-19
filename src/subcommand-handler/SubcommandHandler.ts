@@ -23,27 +23,19 @@ import SWAG, {
 class CommandHandler {
   // <commandName, instance of the Command class>
   private _subCommands: Map<string, Subcommand> = new Map();
-  private _validations = this.getValidations(
-    path.join(__dirname, "validations", "run-time"),
-  );
+  private _validations: any[] = [];
   private _instance: SWAG;
   private _client: Client;
   private _commandsDir: string;
   private _slashCommands: SubSlashCommands;
   private _prefixes: PrefixHandler;
+  private _loading: Promise<void> | undefined;
 
   constructor(instance: SWAG, commandsDir: string, client: Client) {
     this._instance = instance;
     this._commandsDir = commandsDir;
     this._slashCommands = new SubSlashCommands(client);
     this._client = client;
-
-    this._validations = [
-      ...this._validations,
-      ...this.getValidations(instance.validations?.runtime),
-    ];
-
-    this.readFiles();
     this._prefixes = new PrefixHandler(instance);
   }
 
@@ -55,7 +47,17 @@ class CommandHandler {
     return this._slashCommands;
   }
 
+  public load(): Promise<void> {
+    this._loading ??= this.readFiles();
+    return this._loading;
+  }
+
   private async readFiles() {
+    this._validations = [
+      ...this.getValidations(path.join(__dirname, "validations", "run-time")),
+      ...this.getValidations(this._instance.validations?.runtime),
+    ];
+
     const files = getAllFiles(this._commandsDir, true);
     const validations = [
       ...this.getValidations(path.join(__dirname, "validations", "syntax")),
@@ -106,10 +108,10 @@ class CommandHandler {
       if (del) {
         if (testOnly) {
           for (const guildId of this._instance.testServers) {
-            this._slashCommands.delete(command.commandName, guildId);
+            await this._slashCommands.delete(command.commandName, guildId);
           }
         } else {
-          this._slashCommands.delete(command.commandName);
+          await this._slashCommands.delete(command.commandName);
         }
 
         continue;
@@ -128,7 +130,7 @@ class CommandHandler {
 
       if (testOnly) {
         for (const guildId of this._instance.testServers) {
-          this._slashCommands.create(
+          await this._slashCommands.create(
             command.commandName,
             description!,
             optionDatas,
@@ -136,7 +138,7 @@ class CommandHandler {
           );
         }
       } else {
-        this._slashCommands.create(
+        await this._slashCommands.create(
           command.commandName,
           description!,
           optionDatas,

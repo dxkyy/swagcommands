@@ -112,7 +112,7 @@ class SWAGCommands {
         commandsDir,
         client,
       );
-      await this.loadIfSupported(this._commandHandler);
+      await this._commandHandler.load();
     }
 
     if (subcommandsDir) {
@@ -121,7 +121,7 @@ class SWAGCommands {
         subcommandsDir,
         client,
       );
-      await this.loadIfSupported(this._subcommandHandler);
+      await this._subcommandHandler.load();
     }
 
     if (featuresDir) {
@@ -130,7 +130,7 @@ class SWAGCommands {
         featuresDir,
         client,
       );
-      await this.loadIfSupported(featuresHandler);
+      await featuresHandler.load();
     }
 
     this._eventHandler = new EventHandler(
@@ -138,20 +138,8 @@ class SWAGCommands {
       events as Events,
       client,
     );
-
-    if (await this.loadIfSupported(this._eventHandler)) {
-      this._eventHandler.registerEvents();
-    }
-  }
-
-  private async loadIfSupported(handler: unknown): Promise<boolean> {
-    const load = (handler as { load?: unknown }).load;
-    if (typeof load !== "function") {
-      return false;
-    }
-
-    await load.call(handler);
-    return true;
+    await this._eventHandler.load();
+    this._eventHandler.registerEvents();
   }
 
   public get client(): Client {

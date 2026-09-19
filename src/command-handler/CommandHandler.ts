@@ -17,14 +17,13 @@ import SWAG, { CommandObject, CommandUsage } from "../../typings";
 class CommandHandler {
   // <commandName, instance of the Command class>
   private _commands: Map<string, Command> = new Map();
-  private _validations = this.getValidations(
-    path.join(__dirname, "validations", "run-time"),
-  );
+  private _validations: any[] = [];
   private _instance: SWAG;
   private _client: Client;
   private _commandsDir: string;
   private _slashCommands: SlashCommands;
   private _prefixes: PrefixHandler;
+  private _loading: Promise<void> | undefined;
 
   constructor(instance: SWAG, commandsDir: string, client: Client) {
     this._instance = instance;
@@ -32,13 +31,6 @@ class CommandHandler {
     this._slashCommands = new SlashCommands(client);
     this._client = client;
     this._prefixes = new PrefixHandler(instance);
-
-    this._validations = [
-      ...this._validations,
-      ...this.getValidations(instance.validations?.runtime),
-    ];
-
-    this.readFiles();
   }
 
   public get commands() {
@@ -53,7 +45,17 @@ class CommandHandler {
     return this._prefixes;
   }
 
+  public load(): Promise<void> {
+    this._loading ??= this.readFiles();
+    return this._loading;
+  }
+
   private async readFiles() {
+    this._validations = [
+      ...this.getValidations(path.join(__dirname, "validations", "run-time")),
+      ...this.getValidations(this._instance.validations?.runtime),
+    ];
+
     const files = getAllFiles(this._commandsDir);
     const validations = [
       ...this.getValidations(path.join(__dirname, "validations", "syntax")),
@@ -84,10 +86,10 @@ class CommandHandler {
         if (type === "SLASH" || type === "BOTH") {
           if (testOnly) {
             for (const guildId of this._instance.testServers) {
-              this._slashCommands.delete(command.commandName, guildId);
+              await this._slashCommands.delete(command.commandName, guildId);
             }
           } else {
-            this._slashCommands.delete(command.commandName);
+            await this._slashCommands.delete(command.commandName);
           }
         }
 
@@ -113,7 +115,7 @@ class CommandHandler {
 
         if (testOnly) {
           for (const guildId of this._instance.testServers) {
-            this._slashCommands.create(
+            await this._slashCommands.create(
               command.commandName,
               description!,
               options,
@@ -121,7 +123,7 @@ class CommandHandler {
             );
           }
         } else {
-          this._slashCommands.create(
+          await this._slashCommands.create(
             command.commandName,
             description!,
             options,
