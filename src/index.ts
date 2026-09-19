@@ -3,6 +3,7 @@ import SWAG from "./SWAG";
 import CommandType from "./util/CommandType";
 import { CommandDefinitionError } from "./errors/CommandDefinitionError";
 import { CommandExecutionError } from "./errors/CommandExecutionError";
+import { EventExecutionError } from "./errors/EventExecutionError";
 import { InitializationError } from "./errors/InitializationError";
 import { InteractionResponseError } from "./errors/InteractionResponseError";
 import { InteractionAlreadyAcknowledgedError } from "./errors/InteractionAlreadyAcknowledgedError";
@@ -16,6 +17,7 @@ module.exports.CommandType = CommandType;
 module.exports.MemoryPrefixStore = MemoryPrefixStore;
 module.exports.CommandDefinitionError = CommandDefinitionError;
 module.exports.CommandExecutionError = CommandExecutionError;
+module.exports.EventExecutionError = EventExecutionError;
 module.exports.InitializationError = InitializationError;
 module.exports.InteractionAlreadyAcknowledgedError =
   InteractionAlreadyAcknowledgedError;

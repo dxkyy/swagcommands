@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { EventExecutionError } from "../../src/errors/EventExecutionError";
 import EventHandler from "../../src/event-handler/EventHandler";
 
 type RegisteredListener = (...args: unknown[]) => Promise<void>;
 
-const createHandler = (callbacks: unknown[][]) => {
+const createHandler = (
+  callbacks: unknown[][],
+  instance: Record<string, unknown> = {},
+) => {
   let listener: RegisteredListener | undefined;
   const client = {
     on: vi.fn((_eventName: string, registered: RegisteredListener) => {
@@ -14,13 +18,13 @@ const createHandler = (callbacks: unknown[][]) => {
   const handler = Object.create(EventHandler.prototype) as {
     _client: typeof client;
     _eventCallbacks: Map<string, unknown[][]>;
-    _instance: Record<string, never>;
+    _instance: Record<string, unknown>;
     registerEvents(): void;
   };
 
   handler._client = client;
   handler._eventCallbacks = new Map([["customEvent", callbacks]]);
-  handler._instance = {};
+  handler._instance = instance;
   handler.registerEvents();
 
   if (!listener) {
@@ -55,5 +59,31 @@ describe("event execution", () => {
     await dispatch;
 
     expect(secondCallback).toHaveBeenCalledWith("event argument", {});
+  });
+
+  it("reports callback failures and stops the remaining callbacks", async () => {
+    const failure = new Error("event callback failed");
+    const firstCallback = vi.fn().mockRejectedValue(failure);
+    const secondCallback = vi.fn().mockResolvedValue(undefined);
+    const reportError = vi.fn().mockResolvedValue(undefined);
+    const instance = { reportError };
+    const { listener } = createHandler(
+      [[firstCallback], [secondCallback]],
+      instance,
+    );
+
+    await listener("event argument");
+
+    expect(secondCallback).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledOnce();
+    expect(reportError.mock.calls[0][0]).toBeInstanceOf(EventExecutionError);
+    expect(reportError.mock.calls[0][0]).toMatchObject({
+      cause: failure,
+      code: "SWAG_EVENT_EXECUTION_FAILED",
+      context: {
+        eventName: "customEvent",
+      },
+      phase: "event",
+    });
   });
 });

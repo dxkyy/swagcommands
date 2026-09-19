@@ -3,6 +3,10 @@ import path from "path";
 
 import getAllFiles from "../util/get-all-files";
 import SWAG, { Events } from "../../typings";
+import { EventExecutionError } from "../errors/EventExecutionError";
+import { Logger } from "../logger/structures/Logger";
+
+const logger = new Logger();
 
 class EventHandler {
 	// <eventName, array of [function, dynamic validation functions]>
@@ -86,13 +90,27 @@ class EventHandler {
 		for (const eventName of this._eventCallbacks.keys()) {
 			const functions = this._eventCallbacks.get(eventName);
 
-			this._client.on(eventName, async function() {
+			this._client.on(eventName, async (...args: unknown[]) => {
 				for (const [func, dynamicValidation] of functions) {
-					if (dynamicValidation && !(await dynamicValidation(...arguments))) {
-						continue;
-					}
+					try {
+						if (dynamicValidation && !(await dynamicValidation(...args))) {
+							continue;
+						}
 
-					func(...arguments, instance);
+						await func(...args, instance);
+					} catch (error) {
+						try {
+							await instance.reportError(
+								new EventExecutionError(error, { eventName }),
+							);
+						} catch (reportingError) {
+							logger.error(
+								`[SWAG_EVENT_ERROR_HANDLER_FAILED] Failed to report an error from event "${eventName}".`,
+								reportingError,
+							);
+						}
+						return;
+					}
 				}
 			});
 		}

@@ -73,6 +73,10 @@ export class CommandExecutionError extends SwagError {
   public constructor(cause: unknown, context?: ErrorContext);
 }
 
+export class EventExecutionError extends SwagError {
+  public constructor(cause: unknown, context?: ErrorContext);
+}
+
 export class InteractionResponseError extends SwagError {
   public constructor(cause: unknown, context?: ErrorContext);
 }
