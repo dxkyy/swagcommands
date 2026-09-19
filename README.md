@@ -6,7 +6,7 @@ SWAGCommands is an easy-to-use Discord.JS command handler.
 
 ## Documentation
 
-> coming soon
+- [V2 initialization and response behavior](docs/v2-initialization-and-responses.md)
 
 ## Todo
 
