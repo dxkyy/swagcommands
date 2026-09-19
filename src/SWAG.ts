@@ -11,6 +11,7 @@ import { MemoryPrefixStore } from "./prefixes/MemoryPrefixStore";
 import { InitializationError } from "./errors/InitializationError";
 import { ErrorContext, SwagError } from "./errors/SwagError";
 import ResponseHandler from "./execution/ResponseHandler";
+import CommandExecutor from "./execution/CommandExecutor";
 
 export const logger = new Logger();
 
@@ -35,6 +36,7 @@ class SWAGCommands {
   private _state: LifecycleState = "idle";
   private _initialization: Promise<void> | undefined;
   private readonly _options: Options;
+  private readonly _commandExecutor: CommandExecutor;
   private readonly _responseHandler: ResponseHandler;
 
   private constructor(options: Options) {
@@ -47,6 +49,7 @@ class SWAGCommands {
     };
     this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
     this._responseHandler = new ResponseHandler(this);
+    this._commandExecutor = new CommandExecutor(this as unknown as SWAG);
   }
 
   public static async create(options: Options): Promise<SWAGCommands> {
@@ -119,6 +122,7 @@ class SWAGCommands {
         this as unknown as SWAG,
         commandsDir,
         client,
+        this._commandExecutor,
       );
       await this._commandHandler.load();
     }
@@ -128,6 +132,7 @@ class SWAGCommands {
         this as unknown as SWAG,
         subcommandsDir,
         client,
+        this._commandExecutor,
       );
       await this._subcommandHandler.load();
     }

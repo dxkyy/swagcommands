@@ -1,9 +1,7 @@
 import {
   Client,
   CommandInteraction,
-  GuildMember,
   Message,
-  TextChannel,
 } from "discord.js";
 import path from "path";
 
@@ -11,8 +9,8 @@ import getAllFiles from "../util/get-all-files";
 import Command from "./Command";
 import SlashCommands from "./SlashCommands";
 import PrefixHandler from "./PrefixHandler";
-import CommandType from "../util/CommandType";
-import SWAG, { CommandObject, CommandUsage } from "../../typings";
+import SWAG, { CommandObject } from "../../typings";
+import CommandExecutor from "../execution/CommandExecutor";
 
 class CommandHandler {
   // <commandName, instance of the Command class>
@@ -24,13 +22,20 @@ class CommandHandler {
   private _slashCommands: SlashCommands;
   private _prefixes: PrefixHandler;
   private _loading: Promise<void> | undefined;
+  private _executor: CommandExecutor;
 
-  constructor(instance: SWAG, commandsDir: string, client: Client) {
+  constructor(
+    instance: SWAG,
+    commandsDir: string,
+    client: Client,
+    executor: CommandExecutor,
+  ) {
     this._instance = instance;
     this._commandsDir = commandsDir;
     this._slashCommands = new SlashCommands(client);
     this._client = client;
     this._prefixes = new PrefixHandler(instance);
+    this._executor = executor;
   }
 
   public get commands() {
@@ -98,43 +103,15 @@ class CommandHandler {
     args: string[],
     message: Message | null,
     interaction: CommandInteraction | null,
-  ) {
-    const { callback, type } = command.commandObject;
-
-    if (message && type === CommandType.SLASH) {
-      return;
-    }
-
-    const guild = message ? message.guild : interaction?.guild;
-    const member = (
-      message ? message.member : interaction?.member
-    ) as GuildMember;
-    const user = message ? message.author : interaction?.user;
-    const channel = (
-      message ? message.channel : interaction?.channel
-    ) as TextChannel;
-
-    const usage: CommandUsage = {
-      client: command.instance.client,
-      instance: command.instance,
+  ): Promise<void> {
+    await this._executor.executeCommand(
+      command,
+      args,
       message,
       interaction,
-      args,
-      text: args.join(" "),
-      guild,
-      member,
-      user: user!,
-      channel,
-    };
-
-    const prefix = await this._prefixes.get(guild?.id);
-    for (const validation of this._validations) {
-      if (!(await validation(command, usage, prefix))) {
-        return;
-      }
-    }
-
-    return await callback(usage);
+      this._validations,
+      this._prefixes,
+    );
   }
 
   private getValidations(folder?: string) {

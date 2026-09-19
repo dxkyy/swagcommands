@@ -23,36 +23,10 @@ export default async (
     return;
   }
 
-  const { deferReply } = command.commandObject;
-  const responseContext = {
-    commandName: command.commandName,
-    invocationKind: "interaction" as const,
-  };
-
-  if (
-    deferReply &&
-    !(await instance.responseHandler.defer(
-      interaction,
-      deferReply,
-      responseContext,
-    ))
-  ) {
-    return;
-  }
-
-  const response = await commandHandler.runCommand(
+  await commandHandler.runCommand(
     command,
     args,
     null,
     interaction,
-  );
-  if (response === undefined) {
-    return;
-  }
-
-  await instance.responseHandler.respondToInteraction(
-    interaction,
-    response,
-    responseContext,
   );
 };

@@ -2,9 +2,13 @@ import { MessageFlags } from "discord.js";
 import { describe, expect, it, vi } from "vitest";
 
 import { InteractionAlreadyAcknowledgedError } from "../../src/errors/InteractionAlreadyAcknowledgedError";
+import { CommandExecutionError } from "../../src/errors/CommandExecutionError";
 import { InteractionResponseError } from "../../src/errors/InteractionResponseError";
+import Command from "../../src/command-handler/Command";
+import CommandExecutor from "../../src/execution/CommandExecutor";
 import ResponseHandler from "../../src/execution/ResponseHandler";
 import handleSlashCommand from "../../src/event-handler/events/interactionCreate/isCommand/slash-commands";
+import CommandType from "../../src/util/CommandType";
 
 const createInteraction = () => ({
   commandName: "hello",
@@ -20,25 +24,43 @@ const createInteraction = () => ({
 });
 
 const createInstance = (response: unknown, deferReply?: unknown) => {
-  const command = {
-    commandName: "hello",
-    commandObject: {
-      deferReply,
-    },
-  };
-  const runCommand = vi.fn().mockResolvedValue(response);
   const reportError = vi.fn().mockResolvedValue(undefined);
   const responseHandler = new ResponseHandler({ reportError });
+  const instance: any = {
+    client: {},
+    reportError,
+    responseHandler,
+  };
+  const callback = vi.fn().mockResolvedValue(response);
+  const command = new Command(instance, "hello", {
+    callback,
+    deferReply: deferReply as never,
+    type: CommandType.SLASH,
+  });
+  const executor = new CommandExecutor(instance);
+  const prefixes = {
+    get: vi.fn().mockResolvedValue("!"),
+  };
+  const runCommand = vi.fn(
+    (executedCommand, args, message, interaction) =>
+      executor.executeCommand(
+        executedCommand,
+        args,
+        message,
+        interaction,
+        [],
+        prefixes as never,
+      ),
+  );
+  instance.commandHandler = {
+    commands: new Map([["hello", command]]),
+    runCommand,
+  };
 
   return {
+    callback,
     command,
-    instance: {
-      commandHandler: {
-        commands: new Map([["hello", command]]),
-        runCommand,
-      },
-      responseHandler,
-    },
+    instance,
     reportError,
     runCommand,
   };
@@ -137,5 +159,24 @@ describe("interaction command responses", () => {
     expect(reportError).toHaveBeenCalledWith(
       expect.any(InteractionAlreadyAcknowledgedError),
     );
+  });
+
+  it("reports callback failures as command execution errors", async () => {
+    const failure = new Error("Callback failed");
+    const interaction = createInteraction();
+    const { callback, instance, reportError } = createInstance(undefined);
+    callback.mockRejectedValue(failure);
+
+    await handleSlashCommand(interaction as never, instance as never);
+
+    expect(reportError).toHaveBeenCalledOnce();
+    expect(reportError.mock.calls[0][0]).toBeInstanceOf(CommandExecutionError);
+    expect(reportError.mock.calls[0][0]).toMatchObject({
+      cause: failure,
+      context: {
+        commandName: "hello",
+        invocationKind: "interaction",
+      },
+    });
   });
 });

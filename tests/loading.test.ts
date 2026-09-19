@@ -20,6 +20,7 @@ vi.mock("../src/util/get-all-files", () => ({
 }));
 
 import CommandHandler from "../src/command-handler/CommandHandler";
+import CommandExecutor from "../src/execution/CommandExecutor";
 import EventHandler from "../src/event-handler/EventHandler";
 import FeaturesHandler from "../src/util/FeaturesHandler";
 
@@ -61,6 +62,7 @@ describe("explicit handler loading", () => {
       createInstance() as never,
       "/commands",
       {} as never,
+      {} as CommandExecutor,
     );
 
     expect(loading.getAllFiles).not.toHaveBeenCalled();
@@ -149,6 +151,7 @@ describe("explicit handler loading", () => {
       createInstance() as never,
       "/commands",
       client as never,
+      {} as CommandExecutor,
     );
 
     await handler.load();

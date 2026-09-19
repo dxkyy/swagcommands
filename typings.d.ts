@@ -127,6 +127,10 @@ export class ResponseHandler {
     reply: boolean,
     context?: ErrorContext,
   ): Promise<boolean>;
+  public indicateTyping(
+    message: Message,
+    context?: ErrorContext,
+  ): Promise<boolean>;
 }
 
 export interface PrefixStore {

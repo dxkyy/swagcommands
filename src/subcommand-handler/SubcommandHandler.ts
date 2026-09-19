@@ -2,10 +2,6 @@ import {
   ApplicationCommandOptionType,
   Client,
   CommandInteraction,
-  GuildMember,
-  Message,
-  MessagePayload,
-  TextChannel,
 } from "discord.js";
 import path from "path";
 
@@ -17,8 +13,8 @@ import PrefixHandler from "../command-handler/PrefixHandler";
 import SWAG, {
   SubcommandObject,
   SubcommandOptionObject,
-  SubCommandUsage,
 } from "../../typings";
+import CommandExecutor from "../execution/CommandExecutor";
 
 class CommandHandler {
   // <commandName, instance of the Command class>
@@ -30,12 +26,19 @@ class CommandHandler {
   private _slashCommands: SubSlashCommands;
   private _prefixes: PrefixHandler;
   private _loading: Promise<void> | undefined;
+  private _executor: CommandExecutor;
 
-  constructor(instance: SWAG, commandsDir: string, client: Client) {
+  constructor(
+    instance: SWAG,
+    commandsDir: string,
+    client: Client,
+    executor: CommandExecutor,
+  ) {
     this._instance = instance;
     this._commandsDir = commandsDir;
     this._slashCommands = new SubSlashCommands(client);
     this._client = client;
+    this._executor = executor;
     this._prefixes = new PrefixHandler(instance);
   }
 
@@ -126,35 +129,14 @@ class CommandHandler {
     command: SubcommandOption,
     args: string[],
     interaction: CommandInteraction,
-  ): Promise<any> {
-    const { callback } = command.optionObject;
-
-    const guild = interaction.guild;
-    const member = interaction.member as GuildMember;
-    const user = interaction.user;
-    const channel = interaction.channel as TextChannel;
-
-    const usage: SubCommandUsage = {
-      client: command.instance.client,
-      instance: command.instance,
-      interaction,
+  ): Promise<void> {
+    await this._executor.executeSubcommand(
+      command,
       args,
-      text: args.join(" "),
-      guild,
-      member,
-      user: user!,
-      channel,
-    };
-
-    const prefix = await this._prefixes.get(guild?.id);
-
-    for (const validation of this._validations) {
-      if (!(await validation(command, usage, prefix))) {
-        return;
-      }
-    }
-
-    return await callback(usage);
+      interaction,
+      this._validations,
+      this._prefixes,
+    );
   }
 
   private getValidations(folder?: string) {

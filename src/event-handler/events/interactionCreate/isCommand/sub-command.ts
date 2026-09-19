@@ -48,36 +48,9 @@ export default async (
 		return;
 	}
 
-	const deferReply = subcommand.optionObject.deferReply;
-	const responseContext = {
-		commandName: command.commandName,
-		invocationKind: "interaction" as const,
-		subcommandName: subcommand.commandName,
-	};
-
-	if (
-		deferReply &&
-		!(await instance.responseHandler.defer(
-			interaction,
-			deferReply,
-			responseContext
-		))
-	) {
-		return;
-	}
-
-	const response = await subcommandHandler.runCommand(
+	await subcommandHandler.runCommand(
 		subcommand,
 		args!,
 		interaction
-	);
-	if (response === undefined) {
-		return;
-	}
-
-	await instance.responseHandler.respondToInteraction(
-		interaction,
-		response,
-		responseContext
 	);
 };

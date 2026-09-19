@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { MessageResponseError } from "../../src/errors/MessageResponseError";
+import Command from "../../src/command-handler/Command";
+import CommandExecutor from "../../src/execution/CommandExecutor";
 import ResponseHandler from "../../src/execution/ResponseHandler";
 import handleLegacyCommand from "../../src/event-handler/events/messageCreate/isHuman/legacy-commands";
+import CommandType from "../../src/util/CommandType";
 
 const createMessage = () => ({
   author: {
@@ -23,28 +26,44 @@ const createMessage = () => ({
 });
 
 const createInstance = (response: unknown, reply = false) => {
-  const command = {
-    commandName: "hello",
-    commandObject: {
-      reply,
-    },
-  };
-  const runCommand = vi.fn().mockResolvedValue(response);
   const reportError = vi.fn().mockResolvedValue(undefined);
   const responseHandler = new ResponseHandler({ reportError });
+  const instance: any = {
+    client: {},
+    reportError,
+    responseHandler,
+  };
+  const callback = vi.fn().mockResolvedValue(response);
+  const command = new Command(instance, "hello", {
+    callback,
+    reply,
+    type: CommandType.LEGACY,
+  });
+  const executor = new CommandExecutor(instance);
+  const prefixes = {
+    get: vi.fn().mockResolvedValue("!"),
+  };
+  const runCommand = vi.fn(
+    (executedCommand, args, message, interaction) =>
+      executor.executeCommand(
+        executedCommand,
+        args,
+        message,
+        interaction,
+        [],
+        prefixes as never,
+      ),
+  );
+  instance.commandHandler = {
+    commands: new Map([["hello", command]]),
+    prefixHandler: prefixes,
+    runCommand,
+  };
 
   return {
+    callback,
     command,
-    instance: {
-      commandHandler: {
-        commands: new Map([["hello", command]]),
-        prefixHandler: {
-          get: vi.fn().mockResolvedValue("!"),
-        },
-        runCommand,
-      },
-      responseHandler,
-    },
+    instance,
     reportError,
     runCommand,
   };

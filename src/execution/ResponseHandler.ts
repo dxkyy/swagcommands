@@ -140,6 +140,22 @@ class ResponseHandler {
       return false;
     }
   }
+
+  public async indicateTyping(
+    message: Message,
+    context: ErrorContext = {},
+  ): Promise<boolean> {
+    try {
+      if (!message.channel.isSendable()) {
+        throw new Error("The message channel is not sendable.");
+      }
+      await message.channel.sendTyping();
+      return true;
+    } catch (error) {
+      await this._reporter.reportError(new MessageResponseError(error, context));
+      return false;
+    }
+  }
 }
 
 export default ResponseHandler;
