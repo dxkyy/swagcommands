@@ -1,6 +1,7 @@
 import { MemoryPrefixStore } from "./prefixes/MemoryPrefixStore";
 import SWAG from "./SWAG";
 import CommandType from "./util/CommandType";
+import { AutocompleteError } from "./errors/AutocompleteError";
 import { CommandDefinitionError } from "./errors/CommandDefinitionError";
 import { CommandExecutionError } from "./errors/CommandExecutionError";
 import { EventExecutionError } from "./errors/EventExecutionError";
@@ -15,6 +16,7 @@ import ResponseHandler from "./execution/ResponseHandler";
 module.exports = SWAG;
 module.exports.CommandType = CommandType;
 module.exports.MemoryPrefixStore = MemoryPrefixStore;
+module.exports.AutocompleteError = AutocompleteError;
 module.exports.CommandDefinitionError = CommandDefinitionError;
 module.exports.CommandExecutionError = CommandExecutionError;
 module.exports.EventExecutionError = EventExecutionError;

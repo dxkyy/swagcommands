@@ -61,6 +61,10 @@ export class InitializationError extends SwagError {
   public constructor(cause: unknown, options?: { context?: ErrorContext });
 }
 
+export class AutocompleteError extends SwagError {
+  public constructor(cause: unknown, context?: ErrorContext);
+}
+
 export class ModuleLoadError extends SwagError {
   public constructor(cause: unknown, context?: ErrorContext);
 }
