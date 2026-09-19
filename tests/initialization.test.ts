@@ -47,7 +47,7 @@ vi.mock("../src/event-handler/EventHandler", () => ({
 import SWAG from "../src/SWAG";
 
 type AsyncSWAGConstructor = typeof SWAG & {
-  create(options: Record<string, unknown>): Promise<InstanceType<typeof SWAG>>;
+  create(options: Record<string, unknown>): Promise<SWAG>;
 };
 
 const createClient = () => ({
@@ -83,11 +83,20 @@ describe("SWAG initialization", () => {
     });
 
     expect(instance).toBeInstanceOf(SWAG);
+    expect(instance.state).toBe("ready");
+    expect(instance.isReady()).toBe(true);
     expect(lifecycle.commandLoad).toHaveBeenCalledOnce();
     expect(lifecycle.subcommandLoad).toHaveBeenCalledOnce();
     expect(lifecycle.featureLoad).toHaveBeenCalledOnce();
     expect(lifecycle.eventLoad).toHaveBeenCalledOnce();
     expect(lifecycle.eventRegister).toHaveBeenCalledOnce();
+  });
+
+  it("rejects initialization when no Discord client is provided", async () => {
+    await expect(createSWAG({})).rejects.toThrow("A client is required.");
+
+    expect(lifecycle.commandLoad).not.toHaveBeenCalled();
+    expect(lifecycle.eventRegister).not.toHaveBeenCalled();
   });
 
   it("does not resolve until asynchronous handler loading completes", async () => {

@@ -11,6 +11,13 @@ import { MemoryPrefixStore } from "./prefixes/MemoryPrefixStore";
 
 export const logger = new Logger();
 
+export type LifecycleState =
+  | "idle"
+  | "initializing"
+  | "ready"
+  | "failed"
+  | "destroyed";
+
 class SWAGCommands {
   private _client!: Client;
   private _defaultPrefix!: string;
@@ -22,13 +29,49 @@ class SWAGCommands {
   private _eventHandler!: EventHandler;
   private _isConnectedToDB = false;
   private _prefixStore: PrefixStore;
+  private _state: LifecycleState = "idle";
+  private _initialization: Promise<void> | undefined;
+  private readonly _options: Options;
 
-  constructor(options: Options) {
+  private constructor(options: Options) {
+    this._options = {
+      ...options,
+      botOwners: options.botOwners ? [...options.botOwners] : undefined,
+      events: options.events ? { ...options.events } : undefined,
+      testServers: options.testServers ? [...options.testServers] : undefined,
+      validations: options.validations ? { ...options.validations } : undefined,
+    };
     this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
-    this.init(options);
   }
 
-  private async init(options: Options) {
+  public static async create(options: Options): Promise<SWAGCommands> {
+    if (!options) {
+      throw new Error("Options are required.");
+    }
+
+    const instance = new SWAGCommands(options);
+    await instance.initialize();
+    return instance;
+  }
+
+  private initialize(): Promise<void> {
+    this._initialization ??= this.performInitialization();
+    return this._initialization;
+  }
+
+  private async performInitialization(): Promise<void> {
+    this._state = "initializing";
+
+    try {
+      await this.init(this._options);
+      this._state = "ready";
+    } catch (error) {
+      this._state = "failed";
+      throw error;
+    }
+  }
+
+  private async init(options: Options): Promise<void> {
     let {
       client,
       commandsDir,
@@ -40,6 +83,9 @@ class SWAGCommands {
       events = {},
       validations = {},
     } = options;
+
+    botOwners = [...botOwners];
+    testServers = [...testServers];
 
     if (!client) {
       throw new Error("A client is required.");
@@ -66,6 +112,7 @@ class SWAGCommands {
         commandsDir,
         client,
       );
+      await this.loadIfSupported(this._commandHandler);
     }
 
     if (subcommandsDir) {
@@ -74,10 +121,16 @@ class SWAGCommands {
         subcommandsDir,
         client,
       );
+      await this.loadIfSupported(this._subcommandHandler);
     }
 
     if (featuresDir) {
-      new FeaturesHandler(this as unknown as SWAG, featuresDir, client);
+      const featuresHandler = new FeaturesHandler(
+        this as unknown as SWAG,
+        featuresDir,
+        client,
+      );
+      await this.loadIfSupported(featuresHandler);
     }
 
     this._eventHandler = new EventHandler(
@@ -85,6 +138,20 @@ class SWAGCommands {
       events as Events,
       client,
     );
+
+    if (await this.loadIfSupported(this._eventHandler)) {
+      this._eventHandler.registerEvents();
+    }
+  }
+
+  private async loadIfSupported(handler: unknown): Promise<boolean> {
+    const load = (handler as { load?: unknown }).load;
+    if (typeof load !== "function") {
+      return false;
+    }
+
+    await load.call(handler);
+    return true;
   }
 
   public get client(): Client {
@@ -125,6 +192,14 @@ class SWAGCommands {
 
   public get prefixStore(): PrefixStore {
     return this._prefixStore;
+  }
+
+  public get state(): LifecycleState {
+    return this._state;
+  }
+
+  public isReady(): boolean {
+    return this._state === "ready";
   }
 }
 

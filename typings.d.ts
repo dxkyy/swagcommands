@@ -13,6 +13,13 @@ import CommandType from "./src/util/CommandType";
 
 type Awaitable<T> = T | Promise<T>;
 
+export type LifecycleState =
+  | "idle"
+  | "initializing"
+  | "ready"
+  | "failed"
+  | "destroyed";
+
 export interface PrefixStore {
   getPrefix(guildId: string): Awaitable<string | undefined>;
   setPrefix(guildId: string, prefix: string): Awaitable<void>;
@@ -33,8 +40,11 @@ export default class SWAG {
   private _subcommandHandler: SubcommandHandler | undefined;
   private _eventHandler!: EventHandler;
   private _isConnectedToDB = false;
+  private _state: LifecycleState;
 
-  constructor(options: Options);
+  private constructor(options: Options);
+
+  public static create(options: Options): Promise<SWAG>;
 
   public get client(): Client;
   public get defaultPrefix(): string;
@@ -46,6 +56,8 @@ export default class SWAG {
   public get eventHandler(): EventHandler;
   public get isConnectedToDB(): boolean;
   public get prefixStore(): PrefixStore;
+  public get state(): LifecycleState;
+  public isReady(): boolean;
 }
 
 export interface Options {
