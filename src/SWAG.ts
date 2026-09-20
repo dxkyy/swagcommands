@@ -12,6 +12,8 @@ import { InitializationError } from "./errors/InitializationError";
 import { ErrorContext, SwagError } from "./errors/SwagError";
 import ResponseHandler from "./execution/ResponseHandler";
 import CommandExecutor from "./execution/CommandExecutor";
+import { PreconditionHandler } from "./preconditions/PreconditionHandler";
+import { PreconditionStore } from "./preconditions/PreconditionStore";
 
 export const logger = new Logger();
 
@@ -33,6 +35,8 @@ class SWAGCommands {
   private _eventHandler!: EventHandler;
   private _isConnectedToDB = false;
   private _prefixStore: PrefixStore;
+  private _preconditions: PreconditionStore;
+  private _preconditionHandler: PreconditionHandler | undefined;
   private _state: LifecycleState = "idle";
   private _initialization: Promise<void> | undefined;
   private readonly _options: Options;
@@ -48,6 +52,7 @@ class SWAGCommands {
       validations: options.validations ? { ...options.validations } : undefined,
     };
     this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
+    this._preconditions = new PreconditionStore();
     this._responseHandler = new ResponseHandler(this);
     this._commandExecutor = new CommandExecutor(this as unknown as SWAG);
   }
@@ -86,6 +91,7 @@ class SWAGCommands {
     let {
       client,
       commandsDir,
+      preconditionsDir,
       subcommandsDir,
       featuresDir,
       defaultPrefix = "!",
@@ -116,6 +122,15 @@ class SWAGCommands {
     this._testServers = testServers;
     this._botOwners = botOwners;
     this._validations = validations;
+
+    if (preconditionsDir) {
+      this._preconditionHandler = new PreconditionHandler(
+        this as unknown as SWAG,
+        preconditionsDir,
+        this._preconditions,
+      );
+      await this._preconditionHandler.load();
+    }
 
     if (commandsDir) {
       this._commandHandler = new CommandHandler(
@@ -193,6 +208,10 @@ class SWAGCommands {
 
   public get prefixStore(): PrefixStore {
     return this._prefixStore;
+  }
+
+  public get preconditions(): PreconditionStore {
+    return this._preconditions;
   }
 
   public get state(): LifecycleState {

@@ -187,6 +187,7 @@ export default class SWAG {
   private _eventHandler!: EventHandler;
   private _isConnectedToDB = false;
   private _state: LifecycleState;
+  private _preconditions: PreconditionStore;
 
   private constructor(options: Options);
 
@@ -202,6 +203,7 @@ export default class SWAG {
   public get eventHandler(): EventHandler;
   public get isConnectedToDB(): boolean;
   public get prefixStore(): PrefixStore;
+  public get preconditions(): PreconditionStore;
   public get state(): LifecycleState;
   public get responseHandler(): ResponseHandler;
   public isReady(): boolean;
@@ -211,6 +213,7 @@ export default class SWAG {
 export interface Options {
   client: Client;
   commandsDir?: string;
+  preconditionsDir?: string;
   subcommandsDir?: string;
   featuresDir?: string;
   defaultPrefix?: string;

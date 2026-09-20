@@ -5,6 +5,7 @@ const lifecycle = vi.hoisted(() => ({
   eventLoad: vi.fn<() => Promise<void>>(),
   eventRegister: vi.fn<() => void>(),
   featureLoad: vi.fn<() => Promise<void>>(),
+  preconditionLoad: vi.fn<() => Promise<void>>(),
   subcommandLoad: vi.fn<() => Promise<void>>(),
 }));
 
@@ -28,6 +29,14 @@ vi.mock("../src/util/FeaturesHandler", () => ({
   default: class FeaturesHandler {
     async load() {
       await lifecycle.featureLoad();
+    }
+  },
+}));
+
+vi.mock("../src/preconditions/PreconditionHandler", () => ({
+  PreconditionHandler: class PreconditionHandler {
+    async load() {
+      await lifecycle.preconditionLoad();
     }
   },
 }));
@@ -71,6 +80,7 @@ describe("SWAG initialization", () => {
     lifecycle.commandLoad.mockResolvedValue(undefined);
     lifecycle.eventLoad.mockResolvedValue(undefined);
     lifecycle.featureLoad.mockResolvedValue(undefined);
+    lifecycle.preconditionLoad.mockResolvedValue(undefined);
     lifecycle.subcommandLoad.mockResolvedValue(undefined);
   });
 
@@ -80,6 +90,7 @@ describe("SWAG initialization", () => {
       commandsDir: "/commands",
       events: { dir: "/events" },
       featuresDir: "/features",
+      preconditionsDir: "/preconditions",
       subcommandsDir: "/subcommands",
     });
 
@@ -89,8 +100,28 @@ describe("SWAG initialization", () => {
     expect(lifecycle.commandLoad).toHaveBeenCalledOnce();
     expect(lifecycle.subcommandLoad).toHaveBeenCalledOnce();
     expect(lifecycle.featureLoad).toHaveBeenCalledOnce();
+    expect(lifecycle.preconditionLoad).toHaveBeenCalledOnce();
     expect(lifecycle.eventLoad).toHaveBeenCalledOnce();
     expect(lifecycle.eventRegister).toHaveBeenCalledOnce();
+  });
+
+  it("loads preconditions before command definitions", async () => {
+    const order: string[] = [];
+    lifecycle.preconditionLoad.mockImplementation(async () => {
+      order.push("preconditions");
+    });
+    lifecycle.commandLoad.mockImplementation(async () => {
+      order.push("commands");
+    });
+
+    const instance = await createSWAG({
+      client: createClient(),
+      commandsDir: "/commands",
+      preconditionsDir: "/preconditions",
+    });
+
+    expect(order).toEqual(["preconditions", "commands"]);
+    expect(instance.preconditions).toBeDefined();
   });
 
   it("rejects initialization when no Discord client is provided", async () => {
