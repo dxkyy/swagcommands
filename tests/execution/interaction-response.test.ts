@@ -9,6 +9,8 @@ import CommandExecutor from "../../src/execution/CommandExecutor";
 import ResponseHandler from "../../src/execution/ResponseHandler";
 import handleSlashCommand from "../../src/event-handler/events/interactionCreate/isCommand/slash-commands";
 import CommandType from "../../src/util/CommandType";
+import { PreconditionStore } from "../../src/preconditions/PreconditionStore";
+import { PreconditionContainerArray } from "../../src/preconditions/containers/PreconditionContainerArray";
 
 const createInteraction = () => ({
   commandName: "hello",
@@ -32,11 +34,16 @@ const createInstance = (response: unknown, deferReply?: unknown) => {
     responseHandler,
   };
   const callback = vi.fn().mockResolvedValue(response);
-  const command = new Command(instance, "hello", {
-    callback,
-    deferReply: deferReply as never,
-    type: CommandType.SLASH,
-  });
+  const command = new Command(
+    instance,
+    "hello",
+    {
+      callback,
+      deferReply: deferReply as never,
+      type: CommandType.SLASH,
+    },
+    new PreconditionContainerArray(new PreconditionStore()),
+  );
   const executor = new CommandExecutor(instance);
   const prefixes = {
     get: vi.fn().mockResolvedValue("!"),

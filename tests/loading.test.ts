@@ -23,16 +23,22 @@ import CommandHandler from "../src/command-handler/CommandHandler";
 import CommandExecutor from "../src/execution/CommandExecutor";
 import EventHandler from "../src/event-handler/EventHandler";
 import FeaturesHandler from "../src/util/FeaturesHandler";
+import { CommandDefinitionError } from "../src/errors/CommandDefinitionError";
+import { Precondition } from "../src/preconditions/Precondition";
+import { PreconditionStore } from "../src/preconditions/PreconditionStore";
 
-const createInstance = () => ({
-  defaultPrefix: "!",
-  prefixStore: {
-    getPrefix: vi.fn(),
-    setPrefix: vi.fn(),
-  },
-  testServers: [],
-  validations: {},
-});
+const createInstance = () => {
+  return {
+    defaultPrefix: "!",
+    preconditions: new PreconditionStore(),
+    prefixStore: {
+      getPrefix: vi.fn(),
+      setPrefix: vi.fn(),
+    },
+    testServers: [],
+    validations: {},
+  };
+};
 
 describe("explicit handler loading", () => {
   beforeEach(() => {
@@ -160,6 +166,111 @@ describe("explicit handler loading", () => {
     expect(applicationCommands.fetch).not.toHaveBeenCalled();
     expect(applicationCommands.create).not.toHaveBeenCalled();
     expect(applicationCommands.cache.find).not.toHaveBeenCalled();
+  });
+
+  it("resolves registered command preconditions while loading", async () => {
+    class Allowed extends Precondition {
+      public messageRun() {
+        return this.ok();
+      }
+
+      public chatInputRun() {
+        return this.ok();
+      }
+    }
+    const instance = createInstance();
+    instance.preconditions.register(
+      new Allowed(instance as never, "Allowed"),
+    );
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          preconditions: ["Allowed"],
+          type: "BOTH",
+        },
+        filePath: "/commands/hello.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      instance as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await handler.load();
+
+    const command = handler.commands.get("hello");
+    expect(command?.preconditions.entries).toHaveLength(1);
+    expect(command?.preconditions.entries[0]).toMatchObject({
+      name: "Allowed",
+    });
+  });
+
+  it("rejects unavailable command preconditions during loading", async () => {
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          preconditions: ["Missing"],
+          type: "LEGACY",
+        },
+        filePath: "/commands/hello.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await expect(handler.load()).rejects.toMatchObject({
+      code: "SWAG_COMMAND_DEFINITION_INVALID",
+      context: {
+        commandName: "hello",
+        filePath: "/commands/hello.ts",
+      },
+      message: expect.stringContaining(
+        'The precondition "Missing" is not registered.',
+      ),
+    } satisfies Partial<CommandDefinitionError>);
+  });
+
+  it("rejects preconditions that do not support every command flow", async () => {
+    class MessageOnly extends Precondition {
+      public messageRun() {
+        return this.ok();
+      }
+    }
+    const instance = createInstance();
+    instance.preconditions.register(
+      new MessageOnly(instance as never, "MessageOnly"),
+    );
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          preconditions: ["MessageOnly"],
+          type: "BOTH",
+        },
+        filePath: "/commands/hello.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      instance as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await expect(handler.load()).rejects.toMatchObject({
+      code: "SWAG_COMMAND_DEFINITION_INVALID",
+      message: expect.stringContaining(
+        'The precondition "MessageOnly" does not support chat-input commands.',
+      ),
+    } satisfies Partial<CommandDefinitionError>);
   });
 
   it("loads event definitions before registering listeners", async () => {

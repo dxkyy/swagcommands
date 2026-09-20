@@ -11,6 +11,7 @@ import SlashCommands from "./SlashCommands";
 import PrefixHandler from "./PrefixHandler";
 import SWAG, { CommandObject } from "../../typings";
 import CommandExecutor from "../execution/CommandExecutor";
+import { resolveCommandPreconditions } from "../preconditions/resolve-command-preconditions";
 
 class CommandHandler {
   // <commandName, instance of the Command class>
@@ -75,7 +76,21 @@ class CommandHandler {
       let commandName = split.pop()!;
       commandName = commandName.split(".")[0];
 
-      const command = new Command(this._instance, commandName, commandObject);
+      const preconditions = resolveCommandPreconditions(
+        this._instance.preconditions,
+        commandObject.preconditions,
+        {
+          commandName,
+          commandType: commandObject.type,
+          filePath,
+        },
+      );
+      const command = new Command(
+        this._instance,
+        commandName,
+        commandObject,
+        preconditions,
+      );
 
       const { delete: del, aliases = [], init = () => {} } = commandObject;
 

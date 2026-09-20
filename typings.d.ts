@@ -307,7 +307,13 @@ export abstract class AllFlowsPrecondition extends Precondition {
   ): Awaitable<PreconditionResult>;
 }
 
-export class PreconditionStore implements Iterable<[string, Precondition]> {
+export interface PreconditionLookup {
+  get(name: string): Precondition | undefined;
+}
+
+export class PreconditionStore
+  implements PreconditionLookup, Iterable<[string, Precondition]>
+{
   public get size(): number;
   public register(precondition: Precondition): this;
   public get(name: string): Precondition | undefined;
@@ -327,13 +333,22 @@ export class PreconditionHandler {
   public load(): Promise<void>;
 }
 
-export interface PreconditionSingleResolvableDetails {
-  name: string;
-  context?: PreconditionContext;
-}
+export interface Preconditions {}
+
+export type PreconditionKeys = keyof Preconditions & string;
+
+export type SimplePreconditionKeys = {
+  [Key in PreconditionKeys]: Preconditions[Key] extends never ? Key : never;
+}[PreconditionKeys];
+
+export type PreconditionSingleResolvableDetails = {
+  [Key in PreconditionKeys]: Preconditions[Key] extends never
+    ? { name: Key; context?: never }
+    : { name: Key; context: Readonly<Preconditions[Key]> };
+}[PreconditionKeys];
 
 export type PreconditionSingleResolvable =
-  | string
+  | SimplePreconditionKeys
   | PreconditionSingleResolvableDetails;
 
 export type PreconditionEntryResolvable =
@@ -364,7 +379,7 @@ export class PreconditionContainerSingle implements PreconditionContainer {
   public readonly context: PreconditionContext;
   public readonly name: string;
   public constructor(
-    store: PreconditionStore,
+    store: PreconditionLookup,
     data: PreconditionSingleResolvable,
   );
   public messageRun(
@@ -383,7 +398,7 @@ export class PreconditionContainerArray implements PreconditionContainer {
   public readonly entries: readonly PreconditionContainer[];
   public readonly runCondition: PreconditionRunCondition;
   public constructor(
-    store: PreconditionStore,
+    store: PreconditionLookup,
     data?: PreconditionArrayResolvable,
     parent?: PreconditionContainerArray | null,
   );
@@ -402,6 +417,7 @@ export class PreconditionContainerArray implements PreconditionContainer {
 export interface CommandObject {
   callback: (commandUsage: CommandUsage) => Awaitable<CommandResponse | void>;
   type: CommandType;
+  preconditions?: PreconditionArrayResolvable;
   init?: function;
   description?: string;
   aliases?: string[];
@@ -430,11 +446,13 @@ export class Command {
     instance: SWAG,
     commandName: string,
     commandObject: CommandObject,
+    preconditions: PreconditionContainerArray,
   );
 
   public get instance(): SWAG;
   public get commandName(): string;
   public get commandObject(): CommandObject;
+  public get preconditions(): PreconditionContainerArray;
 }
 
 export interface SubcommandObject {

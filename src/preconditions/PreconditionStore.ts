@@ -1,6 +1,12 @@
 import { Precondition } from "./Precondition";
 
-export class PreconditionStore implements Iterable<[string, Precondition]> {
+export interface PreconditionLookup {
+  get(name: string): Precondition | undefined;
+}
+
+export class PreconditionStore
+  implements PreconditionLookup, Iterable<[string, Precondition]>
+{
   private readonly preconditions = new Map<string, Precondition>();
 
   public get size(): number {

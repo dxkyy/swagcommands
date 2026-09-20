@@ -6,6 +6,11 @@ import AutocompleteHandler from "../../src/execution/AutocompleteHandler";
 import Subcommand from "../../src/subcommand-handler/Subcommand";
 import SubcommandOption from "../../src/subcommand-handler/SubcommandOption";
 import CommandType from "../../src/util/CommandType";
+import { PreconditionStore } from "../../src/preconditions/PreconditionStore";
+import { PreconditionContainerArray } from "../../src/preconditions/containers/PreconditionContainerArray";
+
+const createPreconditions = () =>
+  new PreconditionContainerArray(new PreconditionStore());
 
 const createInteraction = (commandName = "search", value = "re") => {
   const interaction = {
@@ -36,11 +41,16 @@ describe("autocomplete execution", () => {
     const autocomplete = vi
       .fn()
       .mockResolvedValue(Array.from({ length: 30 }, (_, index) => `result-${index}`));
-    const command = new Command({} as never, "search", {
-      autocomplete,
-      callback: vi.fn(),
-      type: CommandType.SLASH,
-    });
+    const command = new Command(
+      {} as never,
+      "search",
+      {
+        autocomplete,
+        callback: vi.fn(),
+        type: CommandType.SLASH,
+      },
+      createPreconditions(),
+    );
     const interaction = createInteraction();
     const { handler, reportError } = createHandler();
 
@@ -104,11 +114,16 @@ describe("autocomplete execution", () => {
 
   it("reports callback failures and sends an empty response", async () => {
     const cause = new Error("Lookup failed");
-    const command = new Command({} as never, "search", {
-      autocomplete: vi.fn().mockRejectedValue(cause),
-      callback: vi.fn(),
-      type: CommandType.SLASH,
-    });
+    const command = new Command(
+      {} as never,
+      "search",
+      {
+        autocomplete: vi.fn().mockRejectedValue(cause),
+        callback: vi.fn(),
+        type: CommandType.SLASH,
+      },
+      createPreconditions(),
+    );
     const interaction = createInteraction();
     const { handler, reportError } = createHandler();
 
@@ -133,11 +148,16 @@ describe("autocomplete execution", () => {
 
   it("reports response failures and retries with an empty response", async () => {
     const cause = new Error("Discord request failed");
-    const command = new Command({} as never, "search", {
-      autocomplete: vi.fn().mockResolvedValue(["result"]),
-      callback: vi.fn(),
-      type: CommandType.SLASH,
-    });
+    const command = new Command(
+      {} as never,
+      "search",
+      {
+        autocomplete: vi.fn().mockResolvedValue(["result"]),
+        callback: vi.fn(),
+        type: CommandType.SLASH,
+      },
+      createPreconditions(),
+    );
     const interaction = createInteraction();
     interaction.respond
       .mockRejectedValueOnce(cause)

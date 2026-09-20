@@ -6,7 +6,7 @@ import type {
   PreconditionContext,
 } from "../Precondition";
 import { createPreconditionFailure } from "../PreconditionResult";
-import type { PreconditionStore } from "../PreconditionStore";
+import type { PreconditionLookup } from "../PreconditionStore";
 import type {
   PreconditionContainer,
   PreconditionSingleResolvable,
@@ -17,7 +17,7 @@ export class PreconditionContainerSingle implements PreconditionContainer {
   public readonly name: string;
 
   public constructor(
-    private readonly store: PreconditionStore,
+    private readonly store: PreconditionLookup,
     data: PreconditionSingleResolvable,
   ) {
     if (typeof data === "string") {

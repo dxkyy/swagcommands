@@ -6,6 +6,8 @@ import CommandExecutor from "../../src/execution/CommandExecutor";
 import ResponseHandler from "../../src/execution/ResponseHandler";
 import handleLegacyCommand from "../../src/event-handler/events/messageCreate/isHuman/legacy-commands";
 import CommandType from "../../src/util/CommandType";
+import { PreconditionStore } from "../../src/preconditions/PreconditionStore";
+import { PreconditionContainerArray } from "../../src/preconditions/containers/PreconditionContainerArray";
 
 const createMessage = () => ({
   author: {
@@ -34,11 +36,16 @@ const createInstance = (response: unknown, reply = false) => {
     responseHandler,
   };
   const callback = vi.fn().mockResolvedValue(response);
-  const command = new Command(instance, "hello", {
-    callback,
-    reply,
-    type: CommandType.LEGACY,
-  });
+  const command = new Command(
+    instance,
+    "hello",
+    {
+      callback,
+      reply,
+      type: CommandType.LEGACY,
+    },
+    new PreconditionContainerArray(new PreconditionStore()),
+  );
   const executor = new CommandExecutor(instance);
   const prefixes = {
     get: vi.fn().mockResolvedValue("!"),
