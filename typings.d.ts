@@ -191,6 +191,18 @@ export class MemoryPrefixStore implements PrefixStore {
   setPrefix(guildId: string, prefix: string): void;
 }
 
+export interface CooldownStore {
+  deleteCooldown(cooldownId: string): Awaitable<void>;
+  getCooldown(cooldownId: string): Awaitable<number | undefined>;
+  setCooldown(cooldownId: string, expiresAt: number): Awaitable<void>;
+}
+
+export class MemoryCooldownStore implements CooldownStore {
+  deleteCooldown(cooldownId: string): void;
+  getCooldown(cooldownId: string): number | undefined;
+  setCooldown(cooldownId: string, expiresAt: number): void;
+}
+
 export default class SWAG {
   private _client!: Client;
   private _defaultPrefix: string;
@@ -203,6 +215,7 @@ export default class SWAG {
   private _isConnectedToDB = false;
   private _state: LifecycleState;
   private _preconditions: PreconditionStore;
+  private _cooldownStore: CooldownStore;
 
   private constructor(options: Options);
 
@@ -218,6 +231,7 @@ export default class SWAG {
   public get eventHandler(): EventHandler;
   public get isConnectedToDB(): boolean;
   public get prefixStore(): PrefixStore;
+  public get cooldownStore(): CooldownStore;
   public get preconditions(): PreconditionStore;
   public get state(): LifecycleState;
   public get responseHandler(): ResponseHandler;
@@ -240,6 +254,7 @@ export interface Options {
   events?: Events;
   validations?: Validations;
   prefixStore?: PrefixStore;
+  cooldownStore?: CooldownStore;
   onError?: (error: SwagError, context: ErrorContext) => Awaitable<void>;
   onPreconditionFailure?: (
     event: PreconditionFailureEvent,

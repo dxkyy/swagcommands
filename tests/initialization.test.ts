@@ -105,6 +105,21 @@ describe("SWAG initialization", () => {
     expect(lifecycle.eventRegister).toHaveBeenCalledOnce();
   });
 
+  it("uses an injected cooldown store", async () => {
+    const cooldownStore = {
+      deleteCooldown: vi.fn(),
+      getCooldown: vi.fn(),
+      setCooldown: vi.fn(),
+    };
+
+    const instance = await createSWAG({
+      client: createClient(),
+      cooldownStore,
+    });
+
+    expect(instance.cooldownStore).toBe(cooldownStore);
+  });
+
   it("loads preconditions before command definitions", async () => {
     const order: string[] = [];
     lifecycle.preconditionLoad.mockImplementation(async () => {

@@ -21,6 +21,8 @@ import CommandExecutor from "./execution/CommandExecutor";
 import { PreconditionHandler } from "./preconditions/PreconditionHandler";
 import { PreconditionStore } from "./preconditions/PreconditionStore";
 import { registerBuiltInPreconditions } from "./preconditions/built-ins/BuiltInPreconditions";
+import { CooldownStore } from "./cooldowns/CooldownStore";
+import { MemoryCooldownStore } from "./cooldowns/MemoryCooldownStore";
 
 export const logger = new Logger();
 
@@ -42,6 +44,7 @@ class SWAGCommands {
   private _eventHandler!: EventHandler;
   private _isConnectedToDB = false;
   private _prefixStore: PrefixStore;
+  private _cooldownStore: CooldownStore;
   private _preconditions: PreconditionStore;
   private _preconditionHandler: PreconditionHandler | undefined;
   private _state: LifecycleState = "idle";
@@ -59,6 +62,7 @@ class SWAGCommands {
       validations: options.validations ? { ...options.validations } : undefined,
     };
     this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
+    this._cooldownStore = options.cooldownStore ?? new MemoryCooldownStore();
     this._preconditions = new PreconditionStore();
     registerBuiltInPreconditions(
       this as unknown as SWAG,
@@ -219,6 +223,10 @@ class SWAGCommands {
 
   public get prefixStore(): PrefixStore {
     return this._prefixStore;
+  }
+
+  public get cooldownStore(): CooldownStore {
+    return this._cooldownStore;
   }
 
   public get preconditions(): PreconditionStore {
