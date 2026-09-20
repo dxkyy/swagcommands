@@ -191,13 +191,28 @@ export class MemoryPrefixStore implements PrefixStore {
   setPrefix(guildId: string, prefix: string): void;
 }
 
+export interface CooldownClaim {
+  acquired: boolean;
+  expiresAt: number;
+}
+
 export interface CooldownStore {
+  claimCooldown(
+    cooldownId: string,
+    expiresAt: number,
+    now: number,
+  ): Awaitable<CooldownClaim>;
   deleteCooldown(cooldownId: string): Awaitable<void>;
   getCooldown(cooldownId: string): Awaitable<number | undefined>;
   setCooldown(cooldownId: string, expiresAt: number): Awaitable<void>;
 }
 
 export class MemoryCooldownStore implements CooldownStore {
+  claimCooldown(
+    cooldownId: string,
+    expiresAt: number,
+    now: number,
+  ): CooldownClaim;
   deleteCooldown(cooldownId: string): void;
   getCooldown(cooldownId: string): number | undefined;
   setCooldown(cooldownId: string, expiresAt: number): void;

@@ -107,6 +107,7 @@ describe("SWAG initialization", () => {
 
   it("uses an injected cooldown store", async () => {
     const cooldownStore = {
+      claimCooldown: vi.fn(),
       deleteCooldown: vi.fn(),
       getCooldown: vi.fn(),
       setCooldown: vi.fn(),

@@ -80,21 +80,24 @@ export class CooldownPrecondition extends AllFlowsPrecondition {
     }
 
     const now = Date.now();
-    const expiresAt = await this.instance.cooldownStore.getCooldown(cooldownId);
-    if (expiresAt !== undefined && expiresAt > now) {
+    const claim = await this.instance.cooldownStore.claimCooldown(
+      cooldownId,
+      now + duration,
+      now,
+    );
+    if (!claim.acquired) {
       return this.error({
         context: {
           cooldownId,
-          expiresAt,
-          remaining: expiresAt - now,
+          expiresAt: claim.expiresAt,
+          remaining: claim.expiresAt - now,
           scope,
         },
         identifier: "COOLDOWN_ACTIVE",
-        message: `This command is on cooldown for another ${expiresAt - now}ms.`,
+        message: `This command is on cooldown for another ${claim.expiresAt - now}ms.`,
       });
     }
 
-    await this.instance.cooldownStore.setCooldown(cooldownId, now + duration);
     return this.ok();
   }
 }
