@@ -304,6 +304,98 @@ export abstract class AllFlowsPrecondition extends Precondition {
   ): Awaitable<PreconditionResult>;
 }
 
+export class PreconditionStore implements Iterable<[string, Precondition]> {
+  public get size(): number;
+  public register(precondition: Precondition): this;
+  public get(name: string): Precondition | undefined;
+  public has(name: string): boolean;
+  public delete(name: string): boolean;
+  public clear(): void;
+  public values(): IterableIterator<Precondition>;
+  public [Symbol.iterator](): IterableIterator<[string, Precondition]>;
+}
+
+export class PreconditionHandler {
+  public constructor(
+    instance: SWAG,
+    preconditionsDir: string,
+    store: PreconditionStore,
+  );
+  public load(): Promise<void>;
+}
+
+export interface PreconditionSingleResolvableDetails {
+  name: string;
+  context?: PreconditionContext;
+}
+
+export type PreconditionSingleResolvable =
+  | string
+  | PreconditionSingleResolvableDetails;
+
+export type PreconditionEntryResolvable =
+  | PreconditionSingleResolvable
+  | readonly PreconditionEntryResolvable[];
+
+export type PreconditionArrayResolvable = readonly PreconditionEntryResolvable[];
+
+export interface PreconditionContainer {
+  messageRun(
+    usage: MessageCommandUsage,
+    command: Command,
+    context?: PreconditionContext,
+  ): Promise<PreconditionResult>;
+  chatInputRun(
+    usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionResult>;
+}
+
+export enum PreconditionRunCondition {
+  And = "and",
+  Or = "or",
+}
+
+export class PreconditionContainerSingle implements PreconditionContainer {
+  public readonly context: PreconditionContext;
+  public readonly name: string;
+  public constructor(
+    store: PreconditionStore,
+    data: PreconditionSingleResolvable,
+  );
+  public messageRun(
+    usage: MessageCommandUsage,
+    command: Command,
+    context?: PreconditionContext,
+  ): Promise<PreconditionResult>;
+  public chatInputRun(
+    usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionResult>;
+}
+
+export class PreconditionContainerArray implements PreconditionContainer {
+  public readonly entries: readonly PreconditionContainer[];
+  public readonly runCondition: PreconditionRunCondition;
+  public constructor(
+    store: PreconditionStore,
+    data?: PreconditionArrayResolvable,
+    parent?: PreconditionContainerArray | null,
+  );
+  public messageRun(
+    usage: MessageCommandUsage,
+    command: Command,
+    context?: PreconditionContext,
+  ): Promise<PreconditionResult>;
+  public chatInputRun(
+    usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionResult>;
+}
+
 export interface CommandObject {
   callback: (commandUsage: CommandUsage) => Awaitable<CommandResponse | void>;
   type: CommandType;

@@ -16,6 +16,13 @@ import {
   AllFlowsPrecondition,
   Precondition,
 } from "./preconditions/Precondition";
+import { PreconditionHandler } from "./preconditions/PreconditionHandler";
+import { PreconditionStore } from "./preconditions/PreconditionStore";
+import {
+  PreconditionContainerArray,
+  PreconditionRunCondition,
+} from "./preconditions/containers/PreconditionContainerArray";
+import { PreconditionContainerSingle } from "./preconditions/containers/PreconditionContainerSingle";
 
 module.exports = SWAG;
 module.exports.CommandType = CommandType;
@@ -34,3 +41,8 @@ module.exports.ResponseHandler = ResponseHandler;
 module.exports.SwagError = SwagError;
 module.exports.AllFlowsPrecondition = AllFlowsPrecondition;
 module.exports.Precondition = Precondition;
+module.exports.PreconditionContainerArray = PreconditionContainerArray;
+module.exports.PreconditionContainerSingle = PreconditionContainerSingle;
+module.exports.PreconditionHandler = PreconditionHandler;
+module.exports.PreconditionRunCondition = PreconditionRunCondition;
+module.exports.PreconditionStore = PreconditionStore;
