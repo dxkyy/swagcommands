@@ -7,7 +7,6 @@ import path from "path";
 
 import getAllFiles from "../util/get-all-files";
 import Command from "./Command";
-import SlashCommands from "./SlashCommands";
 import PrefixHandler from "./PrefixHandler";
 import SWAG, { CommandObject } from "../../typings";
 import CommandExecutor from "../execution/CommandExecutor";
@@ -20,7 +19,6 @@ class CommandHandler {
   private _instance: SWAG;
   private _client: Client;
   private _commandsDir: string;
-  private _slashCommands: SlashCommands;
   private _prefixes: PrefixHandler;
   private _loading: Promise<void> | undefined;
   private _executor: CommandExecutor;
@@ -33,7 +31,6 @@ class CommandHandler {
   ) {
     this._instance = instance;
     this._commandsDir = commandsDir;
-    this._slashCommands = new SlashCommands(client);
     this._client = client;
     this._prefixes = new PrefixHandler(instance);
     this._executor = executor;
@@ -41,10 +38,6 @@ class CommandHandler {
 
   public get commands() {
     return this._commands;
-  }
-
-  public get slashCommands() {
-    return this._slashCommands;
   }
 
   public get prefixHandler() {
@@ -87,12 +80,7 @@ class CommandHandler {
         preconditions,
       );
 
-      const { delete: del, aliases = [], init = () => {} } = commandObject;
-
-      // TODO: needs further inspection. removed disabledDefaultCommands check
-      if (del) {
-        continue;
-      }
+      const { aliases = [], init = () => {} } = commandObject;
 
       for (const validation of validations) {
         validation(command);

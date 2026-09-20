@@ -60,7 +60,6 @@ describe("explicit handler loading", () => {
     await new SubcommandHandler(
       instance,
       "/subcommands",
-      client,
       executor,
     ).load();
 
@@ -192,6 +191,30 @@ describe("explicit handler loading", () => {
     expect(applicationCommands.fetch).not.toHaveBeenCalled();
     expect(applicationCommands.create).not.toHaveBeenCalled();
     expect(applicationCommands.cache.find).not.toHaveBeenCalled();
+  });
+
+  it("treats the removed delete tombstone as ordinary unknown metadata", async () => {
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          delete: true,
+          description: "A retained command",
+          type: "SLASH",
+        },
+        filePath: "/commands/retained.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await handler.load();
+
+    expect(handler.commands.has("retained")).toBe(true);
   });
 
   it("resolves registered command preconditions while loading", async () => {

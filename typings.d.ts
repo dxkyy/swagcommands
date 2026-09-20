@@ -668,7 +668,6 @@ export interface CommandObject {
   options?: ApplicationCommandOptionData[];
   autocomplete?: function;
   reply?: boolean;
-  delete?: boolean;
 }
 
 export type FileData = {
@@ -700,7 +699,6 @@ export interface SubcommandObject {
   minArgs?: number;
   maxArgs?: number;
   expectedArgs?: string;
-  delete?: boolean;
 }
 
 export interface SubcommandOptionObject {

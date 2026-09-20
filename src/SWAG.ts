@@ -171,7 +171,6 @@ class SWAGCommands {
       this._subcommandHandler = new SubcommandHandler(
         this as unknown as SWAG,
         subcommandsDir,
-        client,
         this._commandExecutor,
       );
       await this._subcommandHandler.load();

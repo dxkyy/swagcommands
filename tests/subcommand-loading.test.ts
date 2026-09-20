@@ -80,7 +80,6 @@ describe("subcommand precondition loading", () => {
     const handler = new SubcommandHandler(
       instance as never,
       "/subcommands",
-      {} as never,
       {} as CommandExecutor,
     );
 
@@ -124,7 +123,6 @@ describe("subcommand precondition loading", () => {
     const handler = new SubcommandHandler(
       createInstance() as never,
       "/subcommands",
-      {} as never,
       {} as CommandExecutor,
     );
 

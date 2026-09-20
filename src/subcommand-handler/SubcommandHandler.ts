@@ -1,14 +1,9 @@
-import {
-  ApplicationCommandOptionType,
-  Client,
-  CommandInteraction,
-} from "discord.js";
+import { CommandInteraction } from "discord.js";
 import path from "path";
 
 import getAllFiles from "../util/get-all-files";
 import Subcommand from "./Subcommand";
 import SubcommandOption from "./SubcommandOption";
-import SubSlashCommands from "./SubSlashCommand";
 import SWAG, {
   SubcommandObject,
   SubcommandOptionObject,
@@ -21,31 +16,22 @@ class CommandHandler {
   // <commandName, instance of the Command class>
   private _subCommands: Map<string, Subcommand> = new Map();
   private _instance: SWAG;
-  private _client: Client;
   private _commandsDir: string;
-  private _slashCommands: SubSlashCommands;
   private _loading: Promise<void> | undefined;
   private _executor: CommandExecutor;
 
   constructor(
     instance: SWAG,
     commandsDir: string,
-    client: Client,
     executor: CommandExecutor,
   ) {
     this._instance = instance;
     this._commandsDir = commandsDir;
-    this._slashCommands = new SubSlashCommands(client);
-    this._client = client;
     this._executor = executor;
   }
 
   public get commands() {
     return this._subCommands;
-  }
-
-  public get slashCommands() {
-    return this._slashCommands;
   }
 
   public load(): Promise<void> {
@@ -118,12 +104,6 @@ class CommandHandler {
         optionDatas,
         preconditions,
       );
-
-      const { delete: del } = commandObject;
-
-      if (del) {
-        continue;
-      }
 
       if (!index)
         for (const validation of validations) {
