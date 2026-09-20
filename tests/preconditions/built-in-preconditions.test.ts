@@ -40,6 +40,7 @@ describe("built-in preconditions", () => {
       "HasPermissions",
       "OwnerOnly",
       "TestOnly",
+      "Cooldown",
     ]);
   });
 

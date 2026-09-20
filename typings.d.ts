@@ -203,6 +203,26 @@ export class MemoryCooldownStore implements CooldownStore {
   setCooldown(cooldownId: string, expiresAt: number): void;
 }
 
+export enum CooldownScope {
+  User = "user",
+  Channel = "channel",
+  Guild = "guild",
+  Global = "global",
+}
+
+export interface CooldownPreconditionContext extends PreconditionContext {
+  duration: number;
+  id?: string;
+  scope?: CooldownScope;
+}
+
+export function createCooldownId(
+  command: PreconditionCommand,
+  usage: MessageCommandUsage | ChatInputCommandUsage,
+  scope?: CooldownScope,
+  id?: string,
+): string | undefined;
+
 export default class SWAG {
   private _client!: Client;
   private _defaultPrefix: string;
@@ -347,6 +367,7 @@ export class GuildOnlyPrecondition extends AllFlowsPrecondition {}
 export class HasPermissionsPrecondition extends AllFlowsPrecondition {}
 export class OwnerOnlyPrecondition extends AllFlowsPrecondition {}
 export class TestOnlyPrecondition extends AllFlowsPrecondition {}
+export class CooldownPrecondition extends AllFlowsPrecondition {}
 
 export interface PreconditionLookup {
   get(name: string): Precondition | undefined;
@@ -386,6 +407,7 @@ export interface Preconditions {
   };
   OwnerOnly: never;
   TestOnly: never;
+  Cooldown: CooldownPreconditionContext;
 }
 
 export type PreconditionKeys = keyof Preconditions & string;

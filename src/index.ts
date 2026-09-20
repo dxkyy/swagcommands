@@ -1,5 +1,10 @@
 import { MemoryPrefixStore } from "./prefixes/MemoryPrefixStore";
 import { MemoryCooldownStore } from "./cooldowns/MemoryCooldownStore";
+import {
+  CooldownPrecondition,
+  CooldownScope,
+  createCooldownId,
+} from "./cooldowns/CooldownPrecondition";
 import SWAG from "./SWAG";
 import CommandType from "./util/CommandType";
 import { AutocompleteError } from "./errors/AutocompleteError";
@@ -37,6 +42,9 @@ module.exports = SWAG;
 module.exports.CommandType = CommandType;
 module.exports.MemoryPrefixStore = MemoryPrefixStore;
 module.exports.MemoryCooldownStore = MemoryCooldownStore;
+module.exports.CooldownPrecondition = CooldownPrecondition;
+module.exports.CooldownScope = CooldownScope;
+module.exports.createCooldownId = createCooldownId;
 module.exports.AutocompleteError = AutocompleteError;
 module.exports.CommandDefinitionError = CommandDefinitionError;
 module.exports.CommandExecutionError = CommandExecutionError;

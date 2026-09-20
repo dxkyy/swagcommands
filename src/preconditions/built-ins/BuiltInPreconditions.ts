@@ -10,6 +10,7 @@ import { AllFlowsPrecondition } from "../Precondition";
 import type { PreconditionStore } from "../PreconditionStore";
 import type Command from "../../command-handler/Command";
 import type SWAG from "../../../typings";
+import { CooldownPrecondition } from "../../cooldowns/CooldownPrecondition";
 
 type Usage = MessageCommandUsage | ChatInputCommandUsage;
 
@@ -144,6 +145,7 @@ const builtIns = [
   HasPermissionsPrecondition,
   OwnerOnlyPrecondition,
   TestOnlyPrecondition,
+  CooldownPrecondition,
 ] as const;
 
 export function registerBuiltInPreconditions(
