@@ -27,6 +27,7 @@ export type LifecycleState =
 
 export type ErrorPhase =
   | "initialization"
+  | "deployment"
   | "validation"
   | "execution"
   | "response"
@@ -37,8 +38,10 @@ export type InvocationKind = "message" | "interaction" | "autocomplete";
 
 export interface ErrorContext {
   commandName?: string;
+  deploymentScope?: "global" | "guild";
   eventName?: string;
   filePath?: string;
+  guildId?: string;
   invocationKind?: InvocationKind;
   preconditionName?: string;
   subcommandName?: string;
@@ -60,6 +63,17 @@ export class SwagError extends Error {
 
 export class InitializationError extends SwagError {
   public constructor(cause: unknown, options?: { context?: ErrorContext });
+}
+
+export class CommandDeploymentError extends SwagError {
+  public readonly completedTargets: readonly CommandDeploymentTargetResult[];
+  public constructor(
+    cause: unknown,
+    options?: {
+      completedTargets?: readonly CommandDeploymentTargetResult[];
+      context?: ErrorContext;
+    },
+  );
 }
 
 export class AutocompleteError extends SwagError {
@@ -271,11 +285,36 @@ export default class SWAG {
   public get state(): LifecycleState;
   public get responseHandler(): ResponseHandler;
   public isReady(): boolean;
+  public deployCommands(
+    options?: DeployCommandsOptions,
+  ): Promise<CommandDeploymentResult>;
+  public clearCommands(target: ClearCommandsTarget): Promise<void>;
   public reportError(error: SwagError): Promise<void>;
   public handlePreconditionFailure(
     event: PreconditionFailureEvent,
   ): Promise<CommandResponse | void>;
 }
+
+export type CommandDeploymentScope = "global" | "test" | "all";
+
+export interface DeployCommandsOptions {
+  scope?: CommandDeploymentScope;
+  testGuildIds?: readonly string[];
+}
+
+export type CommandDeploymentTarget =
+  | { scope: "global" }
+  | { scope: "guild"; guildId: string };
+
+export type CommandDeploymentTargetResult = CommandDeploymentTarget & {
+  commandNames: readonly string[];
+};
+
+export interface CommandDeploymentResult {
+  targets: readonly CommandDeploymentTargetResult[];
+}
+
+export type ClearCommandsTarget = CommandDeploymentTarget;
 
 export interface Options {
   client: Client;

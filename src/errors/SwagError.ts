@@ -1,5 +1,6 @@
 export type ErrorPhase =
   | "initialization"
+  | "deployment"
   | "validation"
   | "execution"
   | "response"
@@ -10,8 +11,10 @@ export type InvocationKind = "message" | "interaction" | "autocomplete";
 
 export interface ErrorContext {
   commandName?: string;
+  deploymentScope?: "global" | "guild";
   eventName?: string;
   filePath?: string;
+  guildId?: string;
   invocationKind?: InvocationKind;
   preconditionName?: string;
   subcommandName?: string;
