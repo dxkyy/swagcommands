@@ -16,7 +16,6 @@ import { resolveCommandPreconditions } from "../preconditions/resolve-command-pr
 class CommandHandler {
   // <commandName, instance of the Command class>
   private _commands: Map<string, Command> = new Map();
-  private _validations: any[] = [];
   private _instance: SWAG;
   private _client: Client;
   private _commandsDir: string;
@@ -57,11 +56,6 @@ class CommandHandler {
   }
 
   private async readFiles() {
-    this._validations = [
-      ...this.getValidations(path.join(__dirname, "validations", "run-time")),
-      ...this.getValidations(this._instance.validations?.runtime),
-    ];
-
     const files = getAllFiles(this._commandsDir);
     const validations = [
       ...this.getValidations(path.join(__dirname, "validations", "syntax")),
@@ -119,14 +113,7 @@ class CommandHandler {
     message: Message | null,
     interaction: CommandInteraction | null,
   ): Promise<void> {
-    await this._executor.executeCommand(
-      command,
-      args,
-      message,
-      interaction,
-      this._validations,
-      this._prefixes,
-    );
+    await this._executor.executeCommand(command, args, message, interaction);
   }
 
   private getValidations(folder?: string) {

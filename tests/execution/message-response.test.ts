@@ -52,14 +52,7 @@ const createInstance = (response: unknown, reply = false) => {
   };
   const runCommand = vi.fn(
     (executedCommand, args, message, interaction) =>
-      executor.executeCommand(
-        executedCommand,
-        args,
-        message,
-        interaction,
-        [],
-        prefixes as never,
-      ),
+      executor.executeCommand(executedCommand, args, message, interaction),
   );
   instance.commandHandler = {
     commands: new Map([["hello", command]]),

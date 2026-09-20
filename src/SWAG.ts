@@ -2,7 +2,13 @@ import { Client } from "discord.js";
 
 import CommandHandler from "./command-handler/CommandHandler";
 import EventHandler from "./event-handler/EventHandler";
-import SWAG, { Events, Options, Validations } from "../typings";
+import SWAG, {
+  CommandResponse,
+  Events,
+  Options,
+  PreconditionFailureEvent,
+  Validations,
+} from "../typings";
 import FeaturesHandler from "./util/FeaturesHandler";
 import { Logger } from "./logger/structures/Logger";
 import SubcommandHandler from "./subcommand-handler/SubcommandHandler";
@@ -233,6 +239,12 @@ class SWAGCommands {
     }
 
     logger.error(`[${error.code}] ${error.message}`, error.cause);
+  }
+
+  public async handlePreconditionFailure(
+    event: PreconditionFailureEvent,
+  ): Promise<CommandResponse | void> {
+    return await this._options.onPreconditionFailure?.(event);
   }
 }
 

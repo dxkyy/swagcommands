@@ -40,6 +40,7 @@ export interface ErrorContext {
   eventName?: string;
   filePath?: string;
   invocationKind?: InvocationKind;
+  preconditionName?: string;
   subcommandName?: string;
 }
 
@@ -75,6 +76,14 @@ export class CommandDefinitionError extends SwagError {
 
 export class CommandExecutionError extends SwagError {
   public constructor(cause: unknown, context?: ErrorContext);
+}
+
+export class PreconditionExecutionError extends SwagError {
+  public constructor(
+    cause: unknown,
+    preconditionName: string,
+    context?: ErrorContext,
+  );
 }
 
 export class EventExecutionError extends SwagError {
@@ -137,6 +146,12 @@ export interface PreconditionFailureResult {
 export type PreconditionResult =
   | PreconditionSuccessResult
   | PreconditionFailureResult;
+
+export interface PreconditionFailureEvent {
+  command: PreconditionCommand;
+  failure: Readonly<PreconditionFailure>;
+  usage: MessageCommandUsage | ChatInputCommandUsage;
+}
 
 export interface ErrorReporter {
   reportError(error: SwagError): Promise<void>;
@@ -208,6 +223,9 @@ export default class SWAG {
   public get responseHandler(): ResponseHandler;
   public isReady(): boolean;
   public reportError(error: SwagError): Promise<void>;
+  public handlePreconditionFailure(
+    event: PreconditionFailureEvent,
+  ): Promise<CommandResponse | void>;
 }
 
 export interface Options {
@@ -223,6 +241,9 @@ export interface Options {
   validations?: Validations;
   prefixStore?: PrefixStore;
   onError?: (error: SwagError, context: ErrorContext) => Awaitable<void>;
+  onPreconditionFailure?: (
+    event: PreconditionFailureEvent,
+  ) => Awaitable<CommandResponse | void>;
 }
 
 export interface Events {
@@ -231,7 +252,6 @@ export interface Events {
 }
 
 export interface Validations {
-  runtime?: string;
   syntax?: string;
 }
 

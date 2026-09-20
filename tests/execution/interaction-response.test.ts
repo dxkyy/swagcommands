@@ -45,19 +45,9 @@ const createInstance = (response: unknown, deferReply?: unknown) => {
     new PreconditionContainerArray(new PreconditionStore()),
   );
   const executor = new CommandExecutor(instance);
-  const prefixes = {
-    get: vi.fn().mockResolvedValue("!"),
-  };
   const runCommand = vi.fn(
     (executedCommand, args, message, interaction) =>
-      executor.executeCommand(
-        executedCommand,
-        args,
-        message,
-        interaction,
-        [],
-        prefixes as never,
-      ),
+      executor.executeCommand(executedCommand, args, message, interaction),
   );
   instance.commandHandler = {
     commands: new Map([["hello", command]]),

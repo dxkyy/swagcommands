@@ -10,6 +10,7 @@ import { InteractionResponseError } from "./errors/InteractionResponseError";
 import { InteractionAlreadyAcknowledgedError } from "./errors/InteractionAlreadyAcknowledgedError";
 import { MessageResponseError } from "./errors/MessageResponseError";
 import { ModuleLoadError } from "./errors/ModuleLoadError";
+import { PreconditionExecutionError } from "./errors/PreconditionExecutionError";
 import { SwagError } from "./errors/SwagError";
 import ResponseHandler from "./execution/ResponseHandler";
 import {
@@ -37,6 +38,7 @@ module.exports.InteractionAlreadyAcknowledgedError =
 module.exports.InteractionResponseError = InteractionResponseError;
 module.exports.MessageResponseError = MessageResponseError;
 module.exports.ModuleLoadError = ModuleLoadError;
+module.exports.PreconditionExecutionError = PreconditionExecutionError;
 module.exports.ResponseHandler = ResponseHandler;
 module.exports.SwagError = SwagError;
 module.exports.AllFlowsPrecondition = AllFlowsPrecondition;

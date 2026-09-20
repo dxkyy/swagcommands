@@ -9,7 +9,6 @@ import getAllFiles from "../util/get-all-files";
 import Subcommand from "./Subcommand";
 import SubcommandOption from "./SubcommandOption";
 import SubSlashCommands from "./SubSlashCommand";
-import PrefixHandler from "../command-handler/PrefixHandler";
 import SWAG, {
   SubcommandObject,
   SubcommandOptionObject,
@@ -20,12 +19,10 @@ import { resolveChatInputPreconditions } from "../preconditions/resolve-command-
 class CommandHandler {
   // <commandName, instance of the Command class>
   private _subCommands: Map<string, Subcommand> = new Map();
-  private _validations: any[] = [];
   private _instance: SWAG;
   private _client: Client;
   private _commandsDir: string;
   private _slashCommands: SubSlashCommands;
-  private _prefixes: PrefixHandler;
   private _loading: Promise<void> | undefined;
   private _executor: CommandExecutor;
 
@@ -40,7 +37,6 @@ class CommandHandler {
     this._slashCommands = new SubSlashCommands(client);
     this._client = client;
     this._executor = executor;
-    this._prefixes = new PrefixHandler(instance);
   }
 
   public get commands() {
@@ -57,11 +53,6 @@ class CommandHandler {
   }
 
   private async readFiles() {
-    this._validations = [
-      ...this.getValidations(path.join(__dirname, "validations", "run-time")),
-      ...this.getValidations(this._instance.validations?.runtime),
-    ];
-
     const files = getAllFiles(this._commandsDir, true);
     const validations = [
       ...this.getValidations(path.join(__dirname, "validations", "syntax")),
@@ -151,13 +142,7 @@ class CommandHandler {
     args: string[],
     interaction: CommandInteraction,
   ): Promise<void> {
-    await this._executor.executeSubcommand(
-      command,
-      args,
-      interaction,
-      this._validations,
-      this._prefixes,
-    );
+    await this._executor.executeSubcommand(command, args, interaction);
   }
 
   private getValidations(folder?: string) {

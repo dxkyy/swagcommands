@@ -23,6 +23,7 @@ import CommandHandler from "../src/command-handler/CommandHandler";
 import CommandExecutor from "../src/execution/CommandExecutor";
 import EventHandler from "../src/event-handler/EventHandler";
 import FeaturesHandler from "../src/util/FeaturesHandler";
+import SubcommandHandler from "../src/subcommand-handler/SubcommandHandler";
 import { CommandDefinitionError } from "../src/errors/CommandDefinitionError";
 import { Precondition } from "../src/preconditions/Precondition";
 import { PreconditionStore } from "../src/preconditions/PreconditionStore";
@@ -43,6 +44,26 @@ const createInstance = () => {
 describe("explicit handler loading", () => {
   beforeEach(() => {
     loading.files.clear();
+  });
+
+  it("does not discover runtime validation modules", async () => {
+    const instance = createInstance() as never;
+    const executor = {} as CommandExecutor;
+    const client = {} as never;
+
+    await new CommandHandler(instance, "/commands", client, executor).load();
+    await new SubcommandHandler(
+      instance,
+      "/subcommands",
+      client,
+      executor,
+    ).load();
+
+    expect(
+      loading.getAllFiles.mock.calls.some(([directory]) =>
+        directory.includes("run-time"),
+      ),
+    ).toBe(false);
   });
 
   it("does not load or initialize commands in the constructor", async () => {

@@ -13,6 +13,7 @@ export interface ErrorContext {
   eventName?: string;
   filePath?: string;
   invocationKind?: InvocationKind;
+  preconditionName?: string;
   subcommandName?: string;
 }
 

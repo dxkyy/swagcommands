@@ -1,4 +1,5 @@
 import type Command from "../../command-handler/Command";
+import { PreconditionExecutionError } from "../../errors/PreconditionExecutionError";
 import type {
   ChatInputCommandUsage,
   MessageCommandUsage,
@@ -50,11 +51,18 @@ export class PreconditionContainerSingle implements PreconditionContainer {
       });
     }
 
-    return await precondition.messageRun(
-      usage,
-      command,
-      this.mergeContext(context),
-    );
+    try {
+      return await precondition.messageRun(
+        usage,
+        command,
+        this.mergeContext(context),
+      );
+    } catch (error) {
+      throw new PreconditionExecutionError(error, precondition.name, {
+        commandName: command.commandName,
+        invocationKind: "message",
+      });
+    }
   }
 
   public async chatInputRun(
@@ -74,11 +82,24 @@ export class PreconditionContainerSingle implements PreconditionContainer {
       });
     }
 
-    return await precondition.chatInputRun(
-      usage,
-      command,
-      this.mergeContext(context),
-    );
+    try {
+      return await precondition.chatInputRun(
+        usage,
+        command,
+        this.mergeContext(context),
+      );
+    } catch (error) {
+      const isSubcommandOption = "parent" in command;
+      throw new PreconditionExecutionError(error, precondition.name, {
+        commandName: isSubcommandOption
+          ? command.parent.commandName
+          : command.commandName,
+        invocationKind: "interaction",
+        subcommandName: isSubcommandOption
+          ? command.commandName
+          : undefined,
+      });
+    }
   }
 
   private mergeContext(context: PreconditionContext): PreconditionContext {
