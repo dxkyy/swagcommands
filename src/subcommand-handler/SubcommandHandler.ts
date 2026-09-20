@@ -9,22 +9,21 @@ import getAllFiles from "../util/get-all-files";
 import Subcommand from "./Subcommand";
 import SubcommandOption from "./SubcommandOption";
 import SubSlashCommands from "./SubSlashCommand";
-import PrefixHandler from "../command-handler/PrefixHandler";
 import SWAG, {
   SubcommandObject,
   SubcommandOptionObject,
 } from "../../typings";
 import CommandExecutor from "../execution/CommandExecutor";
+import { resolveChatInputPreconditions } from "../preconditions/resolve-command-preconditions";
+import { compileCommandPreconditions } from "../preconditions/compile-command-preconditions";
 
 class CommandHandler {
   // <commandName, instance of the Command class>
   private _subCommands: Map<string, Subcommand> = new Map();
-  private _validations: any[] = [];
   private _instance: SWAG;
   private _client: Client;
   private _commandsDir: string;
   private _slashCommands: SubSlashCommands;
-  private _prefixes: PrefixHandler;
   private _loading: Promise<void> | undefined;
   private _executor: CommandExecutor;
 
@@ -39,7 +38,6 @@ class CommandHandler {
     this._slashCommands = new SubSlashCommands(client);
     this._client = client;
     this._executor = executor;
-    this._prefixes = new PrefixHandler(instance);
   }
 
   public get commands() {
@@ -56,11 +54,6 @@ class CommandHandler {
   }
 
   private async readFiles() {
-    this._validations = [
-      ...this.getValidations(path.join(__dirname, "validations", "run-time")),
-      ...this.getValidations(this._instance.validations?.runtime),
-    ];
-
     const files = getAllFiles(this._commandsDir, true);
     const validations = [
       ...this.getValidations(path.join(__dirname, "validations", "syntax")),
@@ -88,22 +81,42 @@ class CommandHandler {
         }
 
         const optionObject: SubcommandOptionObject = option.fileContents;
+        const preconditions = resolveChatInputPreconditions(
+          this._instance.preconditions,
+          compileCommandPreconditions(optionObject),
+          {
+            commandName,
+            filePath,
+            subcommandName: optionName,
+          },
+        );
 
         const subCommandOption = new SubcommandOption(
           this._instance,
           optionName,
           optionObject,
+          preconditions,
         );
         optionDatas.push(subCommandOption);
       }
 
-      const commandObject: SubcommandObject = require(filePath).default;
+      const commandObject: SubcommandObject =
+        index?.fileContents ?? require(filePath).default;
+      const preconditions = resolveChatInputPreconditions(
+        this._instance.preconditions,
+        compileCommandPreconditions(commandObject),
+        {
+          commandName,
+          filePath: index?.filePath ?? filePath,
+        },
+      );
 
       const command = new Subcommand(
         this._instance,
         commandName,
         commandObject,
         optionDatas,
+        preconditions,
       );
 
       const { delete: del } = commandObject;
@@ -130,13 +143,7 @@ class CommandHandler {
     args: string[],
     interaction: CommandInteraction,
   ): Promise<void> {
-    await this._executor.executeSubcommand(
-      command,
-      args,
-      interaction,
-      this._validations,
-      this._prefixes,
-    );
+    await this._executor.executeSubcommand(command, args, interaction);
   }
 
   private getValidations(folder?: string) {

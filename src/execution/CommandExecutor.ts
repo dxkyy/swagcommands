@@ -8,20 +8,24 @@ import {
 
 import SWAG, { CommandUsage, SubCommandUsage } from "../../typings";
 import Command from "../command-handler/Command";
-import PrefixHandler from "../command-handler/PrefixHandler";
 import CommandType from "../util/CommandType";
 import { CommandExecutionError } from "../errors/CommandExecutionError";
+import { PreconditionExecutionError } from "../errors/PreconditionExecutionError";
+import type {
+  ChatInputCommandUsage,
+  MessageCommandUsage,
+  PreconditionCommand,
+} from "../preconditions/Precondition";
+import type { PreconditionResult } from "../preconditions/PreconditionResult";
+import type {
+  PreconditionCheckResult,
+  PreconditionCommit,
+} from "../preconditions/containers/PreconditionContainer";
 import SubcommandOption from "../subcommand-handler/SubcommandOption";
 import {
   InteractionResponse,
   MessageResponse,
 } from "./ResponseHandler";
-
-type Validation = (
-  command: Command | SubcommandOption,
-  usage: CommandUsage | SubCommandUsage,
-  prefix: string,
-) => boolean | Promise<boolean>;
 
 class CommandExecutor {
   private readonly _instance: SWAG;
@@ -35,8 +39,6 @@ class CommandExecutor {
     args: string[],
     message: Message | null,
     interaction: CommandInteraction | null,
-    validations: Validation[],
-    prefixes: PrefixHandler,
   ): Promise<void> {
     const { callback, deferReply, reply, type } = command.commandObject;
 
@@ -51,27 +53,57 @@ class CommandExecutor {
         | "interaction",
     };
 
-    if (interaction && deferReply) {
-      const deferred = await this._instance.responseHandler.defer(
-        interaction,
-        deferReply,
-        context,
-      );
-      if (!deferred) {
-        return;
-      }
-    } else if (message && deferReply) {
-      await this._instance.responseHandler.indicateTyping(message, context);
-    }
-
     const usage = this.createCommandUsage(command, args, message, interaction);
 
     try {
-      const prefix = await prefixes.get(usage.guild?.id);
-      for (const validation of validations) {
-        if (!(await validation(command, usage, prefix))) {
+      const preconditionResult = message
+        ? await command.preconditions.messageCheck(
+            usage as MessageCommandUsage,
+            command,
+          )
+        : await command.preconditions.chatInputCheck(
+            usage as ChatInputCommandUsage,
+            command,
+          );
+      if (
+        !(await this.handlePreconditionResult(
+          preconditionResult,
+          usage as MessageCommandUsage | ChatInputCommandUsage,
+          command,
+          message,
+          interaction,
+          reply === true,
+          context,
+        ))
+      ) {
+        return;
+      }
+
+      if (
+        !(await this.runPreconditionCommits(
+          preconditionResult,
+          usage as MessageCommandUsage | ChatInputCommandUsage,
+          command,
+          message,
+          interaction,
+          reply === true,
+          context,
+        ))
+      ) {
+        return;
+      }
+
+      if (interaction && deferReply) {
+        const deferred = await this._instance.responseHandler.defer(
+          interaction,
+          deferReply,
+          context,
+        );
+        if (!deferred) {
           return;
         }
+      } else if (message && deferReply) {
+        await this._instance.responseHandler.indicateTyping(message, context);
       }
 
       const response = await callback(usage);
@@ -94,7 +126,7 @@ class CommandExecutor {
         );
       }
     } catch (error) {
-      await this._instance.reportError(new CommandExecutionError(error, context));
+      await this.reportExecutionError(error, context);
     }
   }
 
@@ -102,33 +134,83 @@ class CommandExecutor {
     command: SubcommandOption,
     args: string[],
     interaction: CommandInteraction,
-    validations: Validation[],
-    prefixes: PrefixHandler,
   ): Promise<void> {
     const { callback, deferReply } = command.optionObject;
     const context = {
-      commandName: interaction.commandName,
+      commandName: command.parent.commandName,
       invocationKind: "interaction" as const,
       subcommandName: command.commandName,
     };
 
-    if (deferReply) {
-      const deferred = await this._instance.responseHandler.defer(
-        interaction,
-        deferReply,
-        context,
-      );
-      if (!deferred) {
-        return;
-      }
-    }
-
     const usage = this.createSubcommandUsage(command, args, interaction);
 
     try {
-      const prefix = await prefixes.get(usage.guild?.id);
-      for (const validation of validations) {
-        if (!(await validation(command, usage, prefix))) {
+      const rootResult = await command.parent.preconditions.chatInputCheck(
+        usage as ChatInputCommandUsage,
+        command.parent,
+      );
+      if (
+        !(await this.handlePreconditionResult(
+          rootResult,
+          usage as ChatInputCommandUsage,
+          command.parent,
+          null,
+          interaction,
+          false,
+          context,
+        ))
+      ) {
+        return;
+      }
+
+      const optionResult = await command.preconditions.chatInputCheck(
+        usage as ChatInputCommandUsage,
+        command,
+      );
+      if (
+        !(await this.handlePreconditionResult(
+          optionResult,
+          usage as ChatInputCommandUsage,
+          command,
+          null,
+          interaction,
+          false,
+          context,
+        ))
+      ) {
+        return;
+      }
+
+      if (
+        !(await this.runPreconditionCommits(
+          rootResult,
+          usage as ChatInputCommandUsage,
+          command.parent,
+          null,
+          interaction,
+          false,
+          context,
+        )) ||
+        !(await this.runPreconditionCommits(
+          optionResult,
+          usage as ChatInputCommandUsage,
+          command,
+          null,
+          interaction,
+          false,
+          context,
+        ))
+      ) {
+        return;
+      }
+
+      if (deferReply) {
+        const deferred = await this._instance.responseHandler.defer(
+          interaction,
+          deferReply,
+          context,
+        );
+        if (!deferred) {
           return;
         }
       }
@@ -144,8 +226,101 @@ class CommandExecutor {
         context,
       );
     } catch (error) {
-      await this._instance.reportError(new CommandExecutionError(error, context));
+      await this.reportExecutionError(error, context);
     }
+  }
+
+  private async handlePreconditionResult(
+    result: PreconditionResult,
+    usage: MessageCommandUsage | ChatInputCommandUsage,
+    command: PreconditionCommand,
+    message: Message | null,
+    interaction: CommandInteraction | null,
+    reply: boolean,
+    context: {
+      commandName: string;
+      invocationKind: "message" | "interaction";
+      subcommandName?: string;
+    },
+  ): Promise<boolean> {
+    if (result.success) {
+      return true;
+    }
+
+    const response = await this._instance.handlePreconditionFailure({
+      command,
+      failure: result.failure,
+      usage,
+    });
+    if (response === undefined) {
+      return false;
+    }
+
+    if (interaction) {
+      await this._instance.responseHandler.respondToInteraction(
+        interaction,
+        response as InteractionResponse,
+        context,
+      );
+    } else if (message) {
+      await this._instance.responseHandler.respondToMessage(
+        message,
+        response as MessageResponse,
+        reply,
+        context,
+      );
+    }
+
+    return false;
+  }
+
+  private async runPreconditionCommits(
+    check: PreconditionCheckResult,
+    usage: MessageCommandUsage | ChatInputCommandUsage,
+    command: PreconditionCommand,
+    message: Message | null,
+    interaction: CommandInteraction | null,
+    reply: boolean,
+    context: {
+      commandName: string;
+      invocationKind: "message" | "interaction";
+      subcommandName?: string;
+    },
+  ): Promise<boolean> {
+    if (!check.success) return false;
+
+    for (const commit of check.commits as readonly PreconditionCommit[]) {
+      const result = await commit();
+      if (
+        !(await this.handlePreconditionResult(
+          result,
+          usage,
+          command,
+          message,
+          interaction,
+          reply,
+          context,
+        ))
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private async reportExecutionError(
+    error: unknown,
+    context: {
+      commandName: string;
+      invocationKind: "message" | "interaction";
+      subcommandName?: string;
+    },
+  ): Promise<void> {
+    await this._instance.reportError(
+      error instanceof PreconditionExecutionError
+        ? error
+        : new CommandExecutionError(error, context),
+    );
   }
 
   private createCommandUsage(

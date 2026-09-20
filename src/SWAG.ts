@@ -1,8 +1,14 @@
-import { Client } from "discord.js";
+import { Client, MessageFlags } from "discord.js";
 
 import CommandHandler from "./command-handler/CommandHandler";
 import EventHandler from "./event-handler/EventHandler";
-import SWAG, { Events, Options, Validations } from "../typings";
+import SWAG, {
+  CommandResponse,
+  Events,
+  Options,
+  PreconditionFailureEvent,
+  Validations,
+} from "../typings";
 import FeaturesHandler from "./util/FeaturesHandler";
 import { Logger } from "./logger/structures/Logger";
 import SubcommandHandler from "./subcommand-handler/SubcommandHandler";
@@ -12,6 +18,11 @@ import { InitializationError } from "./errors/InitializationError";
 import { ErrorContext, SwagError } from "./errors/SwagError";
 import ResponseHandler from "./execution/ResponseHandler";
 import CommandExecutor from "./execution/CommandExecutor";
+import { PreconditionHandler } from "./preconditions/PreconditionHandler";
+import { PreconditionStore } from "./preconditions/PreconditionStore";
+import { registerBuiltInPreconditions } from "./preconditions/built-ins/BuiltInPreconditions";
+import { CooldownStore } from "./cooldowns/CooldownStore";
+import { MemoryCooldownStore } from "./cooldowns/MemoryCooldownStore";
 
 export const logger = new Logger();
 
@@ -33,6 +44,9 @@ class SWAGCommands {
   private _eventHandler!: EventHandler;
   private _isConnectedToDB = false;
   private _prefixStore: PrefixStore;
+  private _cooldownStore: CooldownStore;
+  private _preconditions: PreconditionStore;
+  private _preconditionHandler: PreconditionHandler | undefined;
   private _state: LifecycleState = "idle";
   private _initialization: Promise<void> | undefined;
   private readonly _options: Options;
@@ -48,6 +62,12 @@ class SWAGCommands {
       validations: options.validations ? { ...options.validations } : undefined,
     };
     this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
+    this._cooldownStore = options.cooldownStore ?? new MemoryCooldownStore();
+    this._preconditions = new PreconditionStore();
+    registerBuiltInPreconditions(
+      this as unknown as SWAG,
+      this._preconditions,
+    );
     this._responseHandler = new ResponseHandler(this);
     this._commandExecutor = new CommandExecutor(this as unknown as SWAG);
   }
@@ -86,6 +106,7 @@ class SWAGCommands {
     let {
       client,
       commandsDir,
+      preconditionsDir,
       subcommandsDir,
       featuresDir,
       defaultPrefix = "!",
@@ -116,6 +137,15 @@ class SWAGCommands {
     this._testServers = testServers;
     this._botOwners = botOwners;
     this._validations = validations;
+
+    if (preconditionsDir) {
+      this._preconditionHandler = new PreconditionHandler(
+        this as unknown as SWAG,
+        preconditionsDir,
+        this._preconditions,
+      );
+      await this._preconditionHandler.load();
+    }
 
     if (commandsDir) {
       this._commandHandler = new CommandHandler(
@@ -195,6 +225,14 @@ class SWAGCommands {
     return this._prefixStore;
   }
 
+  public get cooldownStore(): CooldownStore {
+    return this._cooldownStore;
+  }
+
+  public get preconditions(): PreconditionStore {
+    return this._preconditions;
+  }
+
   public get state(): LifecycleState {
     return this._state;
   }
@@ -214,6 +252,25 @@ class SWAGCommands {
     }
 
     logger.error(`[${error.code}] ${error.message}`, error.cause);
+  }
+
+  public async handlePreconditionFailure(
+    event: PreconditionFailureEvent,
+  ): Promise<CommandResponse | void> {
+    if (this._options.onPreconditionFailure) {
+      return await this._options.onPreconditionFailure(event);
+    }
+
+    if (!event.failure.message) {
+      return;
+    }
+
+    return event.usage.interaction
+      ? {
+          content: event.failure.message,
+          flags: MessageFlags.Ephemeral,
+        }
+      : event.failure.message;
   }
 }
 

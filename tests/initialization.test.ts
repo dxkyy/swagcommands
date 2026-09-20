@@ -1,3 +1,4 @@
+import { MessageFlags } from "discord.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const lifecycle = vi.hoisted(() => ({
@@ -5,6 +6,7 @@ const lifecycle = vi.hoisted(() => ({
   eventLoad: vi.fn<() => Promise<void>>(),
   eventRegister: vi.fn<() => void>(),
   featureLoad: vi.fn<() => Promise<void>>(),
+  preconditionLoad: vi.fn<() => Promise<void>>(),
   subcommandLoad: vi.fn<() => Promise<void>>(),
 }));
 
@@ -28,6 +30,14 @@ vi.mock("../src/util/FeaturesHandler", () => ({
   default: class FeaturesHandler {
     async load() {
       await lifecycle.featureLoad();
+    }
+  },
+}));
+
+vi.mock("../src/preconditions/PreconditionHandler", () => ({
+  PreconditionHandler: class PreconditionHandler {
+    async load() {
+      await lifecycle.preconditionLoad();
     }
   },
 }));
@@ -71,6 +81,7 @@ describe("SWAG initialization", () => {
     lifecycle.commandLoad.mockResolvedValue(undefined);
     lifecycle.eventLoad.mockResolvedValue(undefined);
     lifecycle.featureLoad.mockResolvedValue(undefined);
+    lifecycle.preconditionLoad.mockResolvedValue(undefined);
     lifecycle.subcommandLoad.mockResolvedValue(undefined);
   });
 
@@ -80,6 +91,7 @@ describe("SWAG initialization", () => {
       commandsDir: "/commands",
       events: { dir: "/events" },
       featuresDir: "/features",
+      preconditionsDir: "/preconditions",
       subcommandsDir: "/subcommands",
     });
 
@@ -89,8 +101,90 @@ describe("SWAG initialization", () => {
     expect(lifecycle.commandLoad).toHaveBeenCalledOnce();
     expect(lifecycle.subcommandLoad).toHaveBeenCalledOnce();
     expect(lifecycle.featureLoad).toHaveBeenCalledOnce();
+    expect(lifecycle.preconditionLoad).toHaveBeenCalledOnce();
     expect(lifecycle.eventLoad).toHaveBeenCalledOnce();
     expect(lifecycle.eventRegister).toHaveBeenCalledOnce();
+  });
+
+  it("uses an injected cooldown store", async () => {
+    const cooldownStore = {
+      claimCooldown: vi.fn(),
+      deleteCooldown: vi.fn(),
+      getCooldown: vi.fn(),
+      setCooldown: vi.fn(),
+    };
+
+    const instance = await createSWAG({
+      client: createClient(),
+      cooldownStore,
+    });
+
+    expect(instance.cooldownStore).toBe(cooldownStore);
+  });
+
+  it("responds with built-in failure messages by default", async () => {
+    const instance = await createSWAG({ client: createClient() });
+    const failure = {
+      identifier: "GUILD_ONLY",
+      message: "This command can only be used in a server.",
+      preconditionName: "GuildOnly",
+    };
+
+    await expect(
+      instance.handlePreconditionFailure({
+        command: {} as never,
+        failure,
+        usage: { interaction: {} } as never,
+      }),
+    ).resolves.toEqual({
+      content: failure.message,
+      flags: MessageFlags.Ephemeral,
+    });
+    await expect(
+      instance.handlePreconditionFailure({
+        command: {} as never,
+        failure,
+        usage: { interaction: null } as never,
+      }),
+    ).resolves.toBe(failure.message);
+  });
+
+  it("allows an explicit failure hook to opt into silence", async () => {
+    const instance = await createSWAG({
+      client: createClient(),
+      onPreconditionFailure: () => undefined,
+    });
+
+    await expect(
+      instance.handlePreconditionFailure({
+        command: {} as never,
+        failure: {
+          identifier: "DENIED",
+          message: "Visible by default",
+          preconditionName: "Guard",
+        },
+        usage: { interaction: {} } as never,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("loads preconditions before command definitions", async () => {
+    const order: string[] = [];
+    lifecycle.preconditionLoad.mockImplementation(async () => {
+      order.push("preconditions");
+    });
+    lifecycle.commandLoad.mockImplementation(async () => {
+      order.push("commands");
+    });
+
+    const instance = await createSWAG({
+      client: createClient(),
+      commandsDir: "/commands",
+      preconditionsDir: "/preconditions",
+    });
+
+    expect(order).toEqual(["preconditions", "commands"]);
+    expect(instance.preconditions).toBeDefined();
   });
 
   it("rejects initialization when no Discord client is provided", async () => {

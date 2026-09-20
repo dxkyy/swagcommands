@@ -23,20 +23,52 @@ import CommandHandler from "../src/command-handler/CommandHandler";
 import CommandExecutor from "../src/execution/CommandExecutor";
 import EventHandler from "../src/event-handler/EventHandler";
 import FeaturesHandler from "../src/util/FeaturesHandler";
+import SubcommandHandler from "../src/subcommand-handler/SubcommandHandler";
+import { CommandDefinitionError } from "../src/errors/CommandDefinitionError";
+import { Precondition } from "../src/preconditions/Precondition";
+import { PreconditionStore } from "../src/preconditions/PreconditionStore";
+import { registerBuiltInPreconditions } from "../src/preconditions/built-ins/BuiltInPreconditions";
 
-const createInstance = () => ({
-  defaultPrefix: "!",
-  prefixStore: {
-    getPrefix: vi.fn(),
-    setPrefix: vi.fn(),
-  },
-  testServers: [],
-  validations: {},
-});
+const createInstance = () => {
+  const instance = {
+    botOwners: ["owner-id"],
+    cooldownStore: {},
+    defaultPrefix: "!",
+    preconditions: new PreconditionStore(),
+    prefixStore: {
+      getPrefix: vi.fn(),
+      setPrefix: vi.fn(),
+    },
+    testServers: [],
+    validations: {},
+  };
+  registerBuiltInPreconditions(instance as never, instance.preconditions);
+  return instance;
+};
 
 describe("explicit handler loading", () => {
   beforeEach(() => {
     loading.files.clear();
+  });
+
+  it("does not discover runtime validation modules", async () => {
+    const instance = createInstance() as never;
+    const executor = {} as CommandExecutor;
+    const client = {} as never;
+
+    await new CommandHandler(instance, "/commands", client, executor).load();
+    await new SubcommandHandler(
+      instance,
+      "/subcommands",
+      client,
+      executor,
+    ).load();
+
+    expect(
+      loading.getAllFiles.mock.calls.some(([directory]) =>
+        directory.includes("run-time"),
+      ),
+    ).toBe(false);
   });
 
   it("does not load or initialize commands in the constructor", async () => {
@@ -160,6 +192,174 @@ describe("explicit handler loading", () => {
     expect(applicationCommands.fetch).not.toHaveBeenCalled();
     expect(applicationCommands.create).not.toHaveBeenCalled();
     expect(applicationCommands.cache.find).not.toHaveBeenCalled();
+  });
+
+  it("resolves registered command preconditions while loading", async () => {
+    class Allowed extends Precondition {
+      public messageRun() {
+        return this.ok();
+      }
+
+      public chatInputRun() {
+        return this.ok();
+      }
+    }
+    const instance = createInstance();
+    instance.preconditions.register(
+      new Allowed(instance as never, "Allowed"),
+    );
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          preconditions: ["Allowed"],
+          type: "BOTH",
+        },
+        filePath: "/commands/hello.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      instance as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await handler.load();
+
+    const command = handler.commands.get("hello");
+    expect(command?.preconditions.entries).toHaveLength(1);
+    expect(command?.preconditions.entries[0]).toMatchObject({
+      name: "Allowed",
+    });
+  });
+
+  it("compiles common command flags before explicit preconditions", async () => {
+    const inline = vi.fn(() => true);
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          expectedArgs: "<project>",
+          guildOnly: true,
+          maxArgs: 1,
+          minArgs: 1,
+          ownerOnly: true,
+          permissions: [8n],
+          preconditions: [inline],
+          testOnly: true,
+          type: "LEGACY",
+        },
+        filePath: "/commands/secure.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await handler.load();
+
+    const command = handler.commands.get("secure")!;
+    expect(command.preconditions.entries.slice(0, 5).map((entry: any) => entry.name)).toEqual([
+      "GuildOnly",
+      "OwnerOnly",
+      "TestOnly",
+      "HasPermissions",
+      "ArgumentCount",
+    ]);
+    expect(command.preconditions.entries).toHaveLength(6);
+    expect(command.commandObject.expectedArgs).toBe("<project>");
+  });
+
+  it("rejects ambiguous nested arrays in favor of explicit combinators", async () => {
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          preconditions: [["GuildOnly", "OwnerOnly"]],
+          type: "LEGACY",
+        },
+        filePath: "/commands/secure.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await expect(handler.load()).rejects.toThrow(
+      "Nested arrays are not supported",
+    );
+  });
+
+  it("rejects unavailable command preconditions during loading", async () => {
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          preconditions: ["Missing"],
+          type: "LEGACY",
+        },
+        filePath: "/commands/hello.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await expect(handler.load()).rejects.toMatchObject({
+      code: "SWAG_COMMAND_DEFINITION_INVALID",
+      context: {
+        commandName: "hello",
+        filePath: "/commands/hello.ts",
+      },
+      message: expect.stringContaining(
+        'The precondition "Missing" is not registered.',
+      ),
+    } satisfies Partial<CommandDefinitionError>);
+  });
+
+  it("rejects preconditions that do not support every command flow", async () => {
+    class MessageOnly extends Precondition {
+      public messageRun() {
+        return this.ok();
+      }
+    }
+    const instance = createInstance();
+    instance.preconditions.register(
+      new MessageOnly(instance as never, "MessageOnly"),
+    );
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          preconditions: ["MessageOnly"],
+          type: "BOTH",
+        },
+        filePath: "/commands/hello.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      instance as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await expect(handler.load()).rejects.toMatchObject({
+      code: "SWAG_COMMAND_DEFINITION_INVALID",
+      message: expect.stringContaining(
+        'The precondition "MessageOnly" does not support chat-input commands.',
+      ),
+    } satisfies Partial<CommandDefinitionError>);
   });
 
   it("loads event definitions before registering listeners", async () => {
