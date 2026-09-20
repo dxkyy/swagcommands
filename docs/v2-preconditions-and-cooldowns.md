@@ -1,26 +1,127 @@
 # V2 preconditions and cooldowns
 
-V2 replaces runtime validation functions and command guard flags with composable preconditions. Preconditions are loaded before command definitions, resolved while commands load, and executed before Discord deferral, message typing indicators, or command callbacks.
+V2 uses preconditions as its single command-guard engine while keeping common command metadata terse. Flags such as `guildOnly`, `permissions`, and `minArgs` are compiled into the same normalized precondition list as custom checks.
 
-## Configure precondition loading
+Preconditions are resolved when commands load and checked before Discord deferral, typing indicators, or callbacks. Flag-derived checks run first in the order documented below, followed by entries in the explicit `preconditions` array.
 
-Pass the directory containing your custom precondition classes to `SWAG.create()`:
+## Common command guards
+
+Use top-level properties for the common cases:
+
+```ts
+import { PermissionFlagsBits } from "discord.js";
+import { CommandType } from "swagcommands";
+
+export default {
+  type: CommandType.BOTH,
+  description: "Delete a project",
+  guildOnly: true,
+  permissions: [PermissionFlagsBits.ManageGuild],
+  minArgs: 1,
+  maxArgs: 1,
+  expectedArgs: "<project>",
+  callback: async ({ args }) => {
+    await deleteProject(args[0]);
+    return "Project deleted.";
+  },
+};
+```
+
+The framework compiles properties in this order:
+
+1. `guildOnly` → `GuildOnly`
+2. `ownerOnly` → `OwnerOnly`
+3. `testOnly` → `TestOnly`
+4. `permissions` → `HasPermissions`
+5. `minArgs`, `maxArgs`, and `expectedArgs` → `ArgumentCount`
+6. Explicit `preconditions`, in their declared order
+
+`expectedArgs` remains command metadata. It is available to help and slash-option generation and is also passed to the compiled `ArgumentCount` check for its usage message. An `ArgumentCount` check is added when `minArgs` or `maxArgs` is present.
+
+The same guard properties are available on subcommand root and leaf definitions. Root checks run before leaf checks.
+
+## Explicit composition
+
+The top-level `preconditions` array is an implicit `all`. Use explicit `any` and `all` combinators for nested expressions:
+
+```ts
+preconditions: [
+  "GuildOnly",
+  {
+    any: [
+      "OwnerOnly",
+      MinimumLevel({ level: 10 }),
+    ],
+  },
+]
+```
+
+This reads as `GuildOnly AND (OwnerOnly OR MinimumLevel)`. Combinators may be nested without changing their meaning:
+
+```ts
+preconditions: [
+  {
+    any: [
+      "OwnerOnly",
+      {
+        all: [
+          "GuildOnly",
+          MinimumLevel({ level: 10 }),
+        ],
+      },
+    ],
+  },
+]
+```
+
+Nested arrays are rejected at load time. There is no alternating AND/OR rule and no bracket depth to count.
+
+Checks short-circuit. `all` stops on its first failure; `any` stops on its first success and reports the last failure when every branch fails.
+
+## One-off inline checks
+
+Use an inline function when extracting a reusable class would add more ceremony than value:
+
+```ts
+import {
+  preconditionError,
+  preconditionOk,
+} from "swagcommands";
+
+preconditions: [
+  (usage) =>
+    usage.user.id === specialUserId
+      ? preconditionOk()
+      : preconditionError(
+          "NOT_SPECIAL_USER",
+          "This command is not available to you.",
+        ),
+]
+```
+
+Returning `true` or `false` is also supported. A bare `false` uses the identifier `INLINE_PRECONDITION_FAILED` and has no default message, so use `preconditionError` when the user should receive a useful response.
+
+Inline checks support normal message and chat-input command execution. Use a class when the check is reusable, needs separate flow implementations, or has a commit phase.
+
+## Reusable typed preconditions
+
+Pass `preconditionsDir` to load reusable classes before command definitions:
 
 ```ts
 const swag = await SWAG.create({
   client,
   commandsDir: "./commands",
   preconditionsDir: "./preconditions",
-  subcommandsDir: "./subcommands",
 });
 ```
 
-Each file must default-export a class extending `Precondition` or `AllFlowsPrecondition`. The filename, without its extension, becomes the registered name.
+A class may declare an explicit stable name. The loader falls back to the filename only when `preconditionName` is absent.
 
 ```ts
 // preconditions/MinimumLevel.ts
 import {
   AllFlowsPrecondition,
+  createPreconditionFactory,
   type ChatInputCommandUsage,
   type Command,
   type MessageCommandUsage,
@@ -32,7 +133,9 @@ interface MinimumLevelContext extends PreconditionContext {
   level: number;
 }
 
-export default class MinimumLevel extends AllFlowsPrecondition {
+class MinimumLevelPrecondition extends AllFlowsPrecondition {
+  public static readonly preconditionName = "MinimumLevel";
+
   public messageRun(
     usage: MessageCommandUsage,
     _command: Command,
@@ -51,7 +154,6 @@ export default class MinimumLevel extends AllFlowsPrecondition {
 
   private run(userId: string, context: MinimumLevelContext) {
     const actualLevel = getLevel(userId);
-
     return actualLevel >= context.level
       ? this.ok()
       : this.error({
@@ -61,253 +163,144 @@ export default class MinimumLevel extends AllFlowsPrecondition {
         });
   }
 }
+
+export const MinimumLevel =
+  createPreconditionFactory<MinimumLevelContext>(MinimumLevelPrecondition);
+
+export default MinimumLevelPrecondition;
 ```
 
-Use declaration merging to make custom names and contexts type-safe in command definitions:
+Importing `MinimumLevel({ level: 10 })` gives autocomplete and context type checking without declaration merging or a magic string at each call site. The class name and helper both derive from the same explicit `preconditionName`, so renaming the file does not change runtime identity.
 
-```ts
-declare module "swagcommands" {
-  interface Preconditions {
-    MinimumLevel: {
-      level: number;
-    };
-  }
-}
-```
+String names remain supported for built-ins, context-free checks, and compatibility. Projects that prefer typed string entries can still augment the exported `Preconditions` interface.
 
-## Add preconditions to commands
-
-Add the `preconditions` array to a command definition. Preconditions without context use their string name. Preconditions requiring configuration use an object with `name` and `context`.
-
-```ts
-export default {
-  type: CommandType.BOTH,
-  description: "Delete a project",
-  preconditions: ["GuildOnly", { name: "MinimumLevel", context: { level: 5 } }],
-  callback: async ({ args }) => {
-    await deleteProject(args[0]);
-    return "Project deleted.";
-  },
-};
-```
-
-The outer array is an AND group and short-circuits on the first failure. Each nested array alternates its condition: the first nested level is OR, the next is AND, and so on.
-
-```ts
-preconditions: [
-  "GuildOnly",
-  ["OwnerOnly", { name: "MinimumLevel", context: { level: 10 } }],
-];
-```
-
-This example means `GuildOnly AND (OwnerOnly OR MinimumLevel)`.
-
-For subcommands, put shared preconditions in the root `index.ts` definition and leaf-specific preconditions in the subcommand file. Root preconditions run first. A root failure prevents leaf preconditions and the callback from running.
-
-## Built-in preconditions
+## Built-ins
 
 V2 registers these preconditions automatically:
 
-| Name             | Context                                 | Behavior                                                               |
-| ---------------- | --------------------------------------- | ---------------------------------------------------------------------- |
-| `GuildOnly`      | None                                    | Requires a guild invocation.                                           |
-| `OwnerOnly`      | None                                    | Requires the invoking user ID to appear in `botOwners`.                |
-| `TestOnly`       | None                                    | Requires the guild ID to appear in `testServers`.                      |
-| `HasPermissions` | `{ permissions: readonly bigint[] }`    | Requires every listed Discord permission. Combine it with `GuildOnly`. |
-| `ArgumentCount`  | `{ minArgs?, maxArgs?, expectedArgs? }` | Checks parsed argument count. `maxArgs: -1` means unlimited.           |
-| `Cooldown`       | `{ duration, scope?, id? }`             | Claims a cooldown bucket. Duration is in milliseconds.                 |
+| Name | Context | Behavior |
+| --- | --- | --- |
+| `GuildOnly` | None | Requires a guild invocation. |
+| `OwnerOnly` | None | Requires the user ID to appear in `botOwners`. |
+| `TestOnly` | None | Requires the guild ID to appear in `testServers`. |
+| `HasPermissions` | `{ permissions: readonly bigint[] }` | Requires a guild member and every listed Discord permission. A DM fails with `GUILD_REQUIRED`. |
+| `ArgumentCount` | `{ minArgs?, maxArgs?, expectedArgs? }` | Checks parsed arguments. `maxArgs: -1` means unlimited. |
+| `Cooldown` | `{ duration, scope?, id? }` | Checks and later claims a cooldown bucket. Duration is milliseconds. |
 
-Example:
+`ArgumentCount`, `HasPermissions`, and `Cooldown` also have typed factories for explicit composition:
 
 ```ts
-import { PermissionFlagsBits } from "discord.js";
+import {
+  ArgumentCount,
+  Cooldown,
+  HasPermissions,
+} from "swagcommands";
 
 preconditions: [
-  "GuildOnly",
-  {
-    name: "HasPermissions",
-    context: {
-      permissions: [PermissionFlagsBits.ManageGuild],
-    },
-  },
-  {
-    name: "ArgumentCount",
-    context: {
-      minArgs: 1,
-      maxArgs: 1,
-      expectedArgs: "<project>",
-    },
-  },
-];
+  HasPermissions({ permissions: [PermissionFlagsBits.ManageGuild] }),
+  ArgumentCount({ minArgs: 1, maxArgs: 1, expectedArgs: "<project>" }),
+  Cooldown({ duration: 5_000 }),
+]
 ```
 
-## Handle failures
+For ordinary definitions, prefer the equivalent top-level properties.
 
-A failed precondition stops execution before deferral, typing indicators, and the callback. By default the failure is silent. Use `onPreconditionFailure` to log it or return a normal command response:
+## Failure responses
+
+Built-in failures with a message respond to users by default. Message commands receive the text through their configured response path. Fresh chat-input interactions receive an ephemeral response.
+
+Override `onPreconditionFailure` to customize messages, log failures, or map identifiers:
 
 ```ts
 const swag = await SWAG.create({
   client,
-  commandsDir: "./commands",
   onPreconditionFailure: async ({ command, failure, usage }) => {
-    console.info(
-      command.commandName,
-      failure.preconditionName,
-      failure.identifier,
-      failure.context,
-    );
+    audit(command.commandName, failure.identifier, usage.user.id);
 
-    return failure.message;
+    return messages[failure.identifier] ?? failure.message;
   },
 });
 ```
 
-The hook receives:
-
-- `command`: the command, subcommand root, or subcommand option that failed;
-- `failure`: an immutable object containing `preconditionName`, `identifier`, optional `message`, and optional structured `context`;
-- `usage`: the same message or chat-input usage passed to the precondition.
-
-If the hook returns `undefined`, SWAGCommands sends no response. If it returns a string or Discord.js response object, the normal response handler sends it. Errors thrown by preconditions are reported through `onError` as `PreconditionExecutionError` with command, subcommand, invocation, and precondition context.
-
-## Cooldowns
-
-The built-in cooldown defaults to one bucket per command and user:
+Returning `undefined` from an explicitly configured hook opts into silence:
 
 ```ts
-preconditions: [
-  {
-    name: "Cooldown",
-    context: { duration: 5_000 },
-  },
-];
+onPreconditionFailure: () => undefined,
 ```
 
-Choose a scope with `CooldownScope`:
+The hook receives the command, the usage, and an immutable failure containing `preconditionName`, `identifier`, optional `message`, and optional structured `context`. Thrown errors are reported through `onError` as `PreconditionExecutionError`.
+
+## Stateful checks and cooldown commits
+
+Execution has two precondition phases:
+
+1. Check every selected precondition branch without mutation.
+2. If all checks pass, run the selected commits immediately before command execution.
+3. Run the callback.
+
+A reusable precondition may implement `messageCommit` and/or `chatInputCommit` in addition to its check methods. Commits are collected only from the successful branch of an `any` group and are discarded if a later check fails.
+
+`Cooldown` uses this mechanism. Its check reads the current expiry but does not claim a bucket. Its commit calls the store's atomic `claimCooldown`. Therefore a later `ArgumentCount` failure does not burn a cooldown, and a cooldown may appear anywhere in an `all` or `any` expression without relying on array order.
+
+Concurrent invocations can both pass the read-only check. The atomic commit allows only one to proceed; the loser receives `COOLDOWN_ACTIVE` before the callback runs.
+
+## Cooldown scopes and stores
+
+The default scope is one bucket per command and user:
 
 ```ts
-import { CooldownScope } from "swagcommands";
-
-preconditions: [
-  {
-    name: "Cooldown",
-    context: {
-      duration: 60_000,
-      scope: CooldownScope.Guild,
-    },
-  },
-];
+Cooldown({ duration: 5_000 })
 ```
 
-Available scopes are:
-
-- `CooldownScope.User`: one bucket for each user; this is the default.
-- `CooldownScope.Channel`: one bucket for each channel.
-- `CooldownScope.Guild`: one bucket for each guild and fails when no guild is available.
-- `CooldownScope.Global`: one bucket shared by every invocation of the command.
-
-Generated IDs include the full command identity, so `admin/ban` and `admin/kick` do not collide. Set `id` to share a bucket across commands:
+Other scopes are `CooldownScope.Channel`, `CooldownScope.Guild`, and `CooldownScope.Global`. Generated IDs include the full command identity, so `admin/ban` and `admin/kick` do not collide. Set `id` to intentionally share a bucket:
 
 ```ts
-{
-  name: "Cooldown",
-  context: {
-    duration: 10_000,
-    scope: CooldownScope.User,
-    id: "moderation-actions",
-  },
-}
+Cooldown({
+  duration: 10_000,
+  scope: CooldownScope.User,
+  id: "moderation-actions",
+})
 ```
 
-An active cooldown fails with identifier `COOLDOWN_ACTIVE`. Its failure context includes `cooldownId`, `scope`, `expiresAt`, and `remaining` milliseconds.
+An active failure includes `cooldownId`, `scope`, `expiresAt`, and `remaining` milliseconds.
 
-### Persistent and distributed cooldown stores
+`MemoryCooldownStore` is the default. Inject a persistent store through `cooldownStore` for restarts or multiple processes. Its `claimCooldown(cooldownId, expiresAt, now)` implementation must atomically return `{ acquired: true, expiresAt }` after claiming a missing or expired bucket, or `{ acquired: false, expiresAt: activeExpiration }` when a live claim exists. Use a transaction, script, or compare-and-set operation in a distributed backend.
 
-SWAGCommands uses `MemoryCooldownStore` by default. Its values are local to one process and disappear on restart. Inject a store for persistence or multiple bot processes:
+## Invocation coverage
 
-```ts
-import type { CooldownClaim, CooldownStore } from "swagcommands";
+Preconditions currently run for:
 
-class RedisCooldownStore implements CooldownStore {
-  async claimCooldown(
-    cooldownId: string,
-    expiresAt: number,
-    now: number,
-  ): Promise<CooldownClaim> {
-    // This operation must atomically check the current expiry and claim the
-    // bucket. Use a transaction, script, or compare-and-set operation.
-  }
+- legacy/message commands;
+- slash/chat-input commands;
+- subcommand roots and selected subcommand leaves.
 
-  async getCooldown(cooldownId: string) {
-    // Return the expiration timestamp in milliseconds, or undefined.
-  }
+They do not currently run for:
 
-  async setCooldown(cooldownId: string, expiresAt: number) {
-    // Store the expiration timestamp in milliseconds.
-  }
+- autocomplete callbacks;
+- buttons or select menus;
+- modals;
+- context-menu commands.
 
-  async deleteCooldown(cooldownId: string) {
-    // Remove the bucket.
-  }
-}
+Autocomplete retains its dedicated callback and error path. Buttons, selects, and modals are handled through events, where applications should call their own shared authorization functions. Context-menu command handling is not implemented yet. Extract the underlying rule into a normal function when command preconditions and component/event handlers must share it.
 
-const swag = await SWAG.create({
-  client,
-  cooldownStore: new RedisCooldownStore(),
-});
-```
+## V1 migration
 
-`claimCooldown` is the operation used during command execution. It must be atomic: return `{ acquired: true, expiresAt }` after claiming an expired or missing bucket, or `{ acquired: false, expiresAt: activeExpiration }` when a live claim already exists. This prevents concurrent invocations from both passing the same cooldown.
+The v1 surface remains available as sugar, but every guard now executes through the precondition engine:
 
-## Migrate from v1 runtime validation
+| V1 property | V2 behavior |
+| --- | --- |
+| `guildOnly: true` | Compiles to `GuildOnly`. |
+| `ownerOnly: true` | Compiles to `OwnerOnly`. |
+| `testOnly: true` | Compiles to `TestOnly`. |
+| `permissions: [...]` | Compiles to guild-aware `HasPermissions`. |
+| `minArgs`, `maxArgs`, `expectedArgs` | Remain command metadata and compile to `ArgumentCount` when a limit is set. |
+| A function in `validations.runtime` | Move it inline into `preconditions`, or create a reusable class and typed factory. |
 
-The `validations.runtime` option and command guard flags are removed in v2. Replace them as follows:
+`validations.runtime` itself is removed. `validations.syntax` remains because definition-time linting is separate from execution guards.
 
-| V1 definition                                         | V2 precondition                                                                             |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `guildOnly: true`                                     | `"GuildOnly"`                                                                               |
-| `ownerOnly: true`                                     | `"OwnerOnly"`                                                                               |
-| `testOnly: true`                                      | `"TestOnly"`                                                                                |
-| `permissions: [PermissionFlagsBits.ManageGuild]`      | `{ name: "HasPermissions", context: { permissions: [...] } }`, normally after `"GuildOnly"` |
-| `minArgs`, `maxArgs`, and runtime argument validation | `{ name: "ArgumentCount", context: { minArgs, maxArgs, expectedArgs } }`                    |
-| A function in `validations.runtime`                   | A class in `preconditionsDir`                                                               |
+Migration also changes failure behavior:
 
-For example:
-
-```ts
-// V1
-export default {
-  guildOnly: true,
-  ownerOnly: true,
-  permissions: [PermissionFlagsBits.ManageGuild],
-  minArgs: 1,
-  maxArgs: 1,
-  expectedArgs: "<project>",
-  callback,
-};
-
-// V2
-export default {
-  preconditions: [
-    "GuildOnly",
-    "OwnerOnly",
-    {
-      name: "HasPermissions",
-      context: { permissions: [PermissionFlagsBits.ManageGuild] },
-    },
-    {
-      name: "ArgumentCount",
-      context: { minArgs: 1, maxArgs: 1, expectedArgs: "<project>" },
-    },
-  ],
-  callback,
-};
-```
-
-Also account for these behavioral changes:
-
-- Built-in failures no longer send responses themselves. Return a response from `onPreconditionFailure` when users should see one.
-- Preconditions are validated at load time. Missing names, malformed entries, or handlers incompatible with a command flow fail initialization with `CommandDefinitionError`.
-- Custom preconditions load before commands, so command definitions may safely reference them.
-- Root subcommand preconditions and leaf preconditions are distinct and execute in that order.
-- `validations.syntax` remains available for custom definition-time validation; it is not an execution guard.
+- Built-in failures now show their default message instead of silently stopping.
+- Configure `onPreconditionFailure` to customize messages.
+- Configure `onPreconditionFailure: () => undefined` only when silence is intentional.
+- Invalid names, malformed combinators, nested arrays, and flow-incompatible classes fail command loading with `CommandDefinitionError`.

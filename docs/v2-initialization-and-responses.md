@@ -146,7 +146,7 @@ SWAGCommands filters those strings against the focused value, limits the result 
 - Replace `new SWAG(options)` with `await SWAG.create(options)`.
 - Catch rejected initialization or let it fail application startup explicitly.
 - Provide `botOwners` when any command or subcommand uses the `OwnerOnly` precondition.
-- Replace v1 runtime guard fields and `validations.runtime` with [v2 preconditions](v2-preconditions-and-cooldowns.md).
+- Keep common guard fields as v2 precondition sugar, and move functions from `validations.runtime` to [inline or reusable preconditions](v2-preconditions-and-cooldowns.md).
 - Move slash-command deployment out of command loading.
 - Use `deferReply: { ephemeral: true }` for ephemeral deferrals.
 - Add `onError` when the application needs custom logging or reporting.
