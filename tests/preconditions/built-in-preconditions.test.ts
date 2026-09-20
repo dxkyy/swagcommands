@@ -120,4 +120,23 @@ describe("built-in preconditions", () => {
       success: false,
     });
   });
+
+  it("fails permissions cleanly when guild context is unavailable", async () => {
+    const store = new PreconditionStore();
+    registerBuiltInPreconditions(createInstance() as never, store);
+
+    await expect(
+      await store.get("HasPermissions")!.messageRun!(
+        createUsage({ guild: null, member: null }) as never,
+        { commandName: "secure" } as never,
+        { permissions: [PermissionFlagsBits.ManageGuild] },
+      ),
+    ).toMatchObject({
+      failure: {
+        identifier: "GUILD_REQUIRED",
+        message: "This command can only be used in a server.",
+      },
+      success: false,
+    });
+  });
 });

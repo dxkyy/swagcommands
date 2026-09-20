@@ -10,6 +10,10 @@ type PreconditionConstructor = new (
   name: string,
 ) => Precondition;
 
+type NamedPreconditionConstructor = PreconditionConstructor & {
+  preconditionName?: string;
+};
+
 function isPreconditionConstructor(
   value: unknown,
 ): value is PreconditionConstructor {
@@ -35,14 +39,14 @@ export class PreconditionHandler {
 
   private async readFiles(): Promise<void> {
     for (const file of getAllFiles(this.preconditionsDir)) {
-      const PreconditionClass = file.fileContents;
+      const PreconditionClass = file.fileContents as NamedPreconditionConstructor;
       if (!isPreconditionConstructor(PreconditionClass)) {
         throw new TypeError(
           `Precondition file "${file.filePath}" must default-export a class extending Precondition.`,
         );
       }
 
-      const name = path.parse(file.filePath).name;
+      const name = PreconditionClass.preconditionName ?? path.parse(file.filePath).name;
       this.store.register(new PreconditionClass(this.instance, name));
     }
   }

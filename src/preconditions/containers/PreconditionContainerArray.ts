@@ -14,7 +14,10 @@ import {
 import type { PreconditionLookup } from "../PreconditionStore";
 import {
   isPreconditionSingleResolvable,
+  isPreconditionGroupResolvable,
   PreconditionArrayResolvable,
+  PreconditionCheckResult,
+  PreconditionCommit,
   PreconditionContainer,
   PreconditionEntryResolvable,
 } from "./PreconditionContainer";
@@ -36,14 +39,11 @@ export class PreconditionContainerArray implements PreconditionContainer {
   public constructor(
     private readonly store: PreconditionLookup,
     data: PreconditionArrayResolvable = [],
-    parent: PreconditionContainerArray | null = null,
+    runCondition: PreconditionRunCondition = PreconditionRunCondition.And,
   ) {
-    this.runCondition =
-      parent?.runCondition === PreconditionRunCondition.And
-        ? PreconditionRunCondition.Or
-        : PreconditionRunCondition.And;
+    this.runCondition = runCondition;
 
-    if (parent && data.length === 0) {
+    if (runCondition === PreconditionRunCondition.Or && data.length === 0) {
       throw new TypeError("A nested precondition group cannot be empty.");
     }
 
@@ -68,6 +68,24 @@ export class PreconditionContainerArray implements PreconditionContainer {
     return this.run((entry) => entry.chatInputRun(usage, command, context));
   }
 
+  public messageCheck(
+    usage: MessageCommandUsage,
+    command: Command,
+    context: PreconditionContext = {},
+  ): Promise<PreconditionCheckResult> {
+    return this.check((entry) => entry.messageCheck(usage, command, context));
+  }
+
+  public chatInputCheck(
+    usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext = {},
+  ): Promise<PreconditionCheckResult> {
+    return this.check((entry) =>
+      entry.chatInputCheck(usage, command, context),
+    );
+  }
+
   private createContainer(
     entry: PreconditionEntryResolvable,
   ): PreconditionContainer {
@@ -75,8 +93,20 @@ export class PreconditionContainerArray implements PreconditionContainer {
       return new PreconditionContainerSingle(this.store, entry);
     }
 
-    if (Array.isArray(entry)) {
-      return new PreconditionContainerArray(this.store, entry, this);
+    if (isPreconditionGroupResolvable(entry)) {
+      if ("any" in entry) {
+        return new PreconditionContainerArray(
+          this.store,
+          entry.any,
+          PreconditionRunCondition.Or,
+        );
+      }
+
+      return new PreconditionContainerArray(
+        this.store,
+        entry.all,
+        PreconditionRunCondition.And,
+      );
     }
 
     throw new TypeError("Invalid precondition entry.");
@@ -110,5 +140,31 @@ export class PreconditionContainerArray implements PreconditionContainer {
         message: "An OR precondition group did not contain any entries.",
       })
     );
+  }
+
+  private async check(
+    runner: (entry: PreconditionContainer) => Promise<PreconditionCheckResult>,
+  ): Promise<PreconditionCheckResult> {
+    if (this.runCondition === PreconditionRunCondition.And) {
+      const commits: PreconditionCommit[] = [];
+      for (const entry of this.entries) {
+        const result = await runner(entry);
+        if (!result.success) return result;
+        commits.push(...result.commits);
+      }
+      return { commits: Object.freeze(commits), success: true };
+    }
+
+    let lastFailure: Extract<PreconditionResult, { success: false }> | undefined;
+    for (const entry of this.entries) {
+      const result = await runner(entry);
+      if (result.success) return result;
+      lastFailure = result;
+    }
+
+    return lastFailure ?? createPreconditionFailure("PreconditionContainer", {
+      identifier: "PRECONDITION_EMPTY_OR_GROUP",
+      message: "An OR precondition group did not contain any entries.",
+    });
   }
 }

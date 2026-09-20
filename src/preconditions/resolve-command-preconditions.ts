@@ -6,8 +6,10 @@ import type CommandType from "../util/CommandType";
 import { CommandDefinitionError } from "../errors/CommandDefinitionError";
 import {
   isPreconditionSingleResolvable,
+  isPreconditionGroupResolvable,
   PreconditionArrayResolvable,
   PreconditionEntryResolvable,
+  PreconditionSingleResolvable,
   PreconditionSingleResolvableDetails,
 } from "./containers/PreconditionContainer";
 import { PreconditionContainerArray } from "./containers/PreconditionContainerArray";
@@ -85,9 +87,24 @@ function validateEntries(
 
   for (const entry of entries) {
     if (Array.isArray(entry)) {
+      throw definitionError(
+        options,
+        "Nested arrays are not supported. Use { any: [...] } or { all: [...] }.",
+      );
+    }
+
+    if (isPreconditionGroupResolvable(entry)) {
+      const hasAny = "any" in entry;
+      const hasAll = "all" in entry;
+      if (hasAny === hasAll) {
+        throw definitionError(
+          options,
+          "A precondition group must define exactly one of any or all.",
+        );
+      }
       validateEntries(
         store,
-        entry as PreconditionArrayResolvable,
+        hasAny ? entry.any : entry.all,
         options,
         depth + 1,
       );
@@ -100,7 +117,7 @@ function validateEntries(
 
     validateSingle(
       store,
-      entry as string | PreconditionSingleResolvableDetails,
+      entry as PreconditionSingleResolvable,
       options,
     );
   }
@@ -108,9 +125,12 @@ function validateEntries(
 
 function validateSingle(
   store: PreconditionLookup,
-  entry: string | PreconditionSingleResolvableDetails,
+  entry: PreconditionSingleResolvable,
   options: ResolvePreconditionsOptions,
 ): void {
+  if (typeof entry === "function") {
+    return;
+  }
   const name = typeof entry === "string" ? entry : entry.name;
   if (!name) {
     throw definitionError(options, "Precondition names cannot be empty.");

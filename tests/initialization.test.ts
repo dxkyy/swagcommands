@@ -1,3 +1,4 @@
+import { MessageFlags } from "discord.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const lifecycle = vi.hoisted(() => ({
@@ -119,6 +120,52 @@ describe("SWAG initialization", () => {
     });
 
     expect(instance.cooldownStore).toBe(cooldownStore);
+  });
+
+  it("responds with built-in failure messages by default", async () => {
+    const instance = await createSWAG({ client: createClient() });
+    const failure = {
+      identifier: "GUILD_ONLY",
+      message: "This command can only be used in a server.",
+      preconditionName: "GuildOnly",
+    };
+
+    await expect(
+      instance.handlePreconditionFailure({
+        command: {} as never,
+        failure,
+        usage: { interaction: {} } as never,
+      }),
+    ).resolves.toEqual({
+      content: failure.message,
+      flags: MessageFlags.Ephemeral,
+    });
+    await expect(
+      instance.handlePreconditionFailure({
+        command: {} as never,
+        failure,
+        usage: { interaction: null } as never,
+      }),
+    ).resolves.toBe(failure.message);
+  });
+
+  it("allows an explicit failure hook to opt into silence", async () => {
+    const instance = await createSWAG({
+      client: createClient(),
+      onPreconditionFailure: () => undefined,
+    });
+
+    await expect(
+      instance.handlePreconditionFailure({
+        command: {} as never,
+        failure: {
+          identifier: "DENIED",
+          message: "Visible by default",
+          preconditionName: "Guard",
+        },
+        usage: { interaction: {} } as never,
+      }),
+    ).resolves.toBeUndefined();
   });
 
   it("loads preconditions before command definitions", async () => {

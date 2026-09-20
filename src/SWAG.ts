@@ -1,4 +1,4 @@
-import { Client } from "discord.js";
+import { Client, MessageFlags } from "discord.js";
 
 import CommandHandler from "./command-handler/CommandHandler";
 import EventHandler from "./event-handler/EventHandler";
@@ -257,7 +257,20 @@ class SWAGCommands {
   public async handlePreconditionFailure(
     event: PreconditionFailureEvent,
   ): Promise<CommandResponse | void> {
-    return await this._options.onPreconditionFailure?.(event);
+    if (this._options.onPreconditionFailure) {
+      return await this._options.onPreconditionFailure(event);
+    }
+
+    if (!event.failure.message) {
+      return;
+    }
+
+    return event.usage.interaction
+      ? {
+          content: event.failure.message,
+          flags: MessageFlags.Ephemeral,
+        }
+      : event.failure.message;
   }
 }
 

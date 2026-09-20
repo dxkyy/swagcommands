@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   AllFlowsPrecondition,
+  createPreconditionFactory,
   Precondition,
+  preconditionError,
+  preconditionOk,
 } from "../../src/preconditions/Precondition";
 
 describe("Precondition", () => {
@@ -78,5 +81,25 @@ describe("Precondition", () => {
     expect(
       await allFlowsPrecondition.chatInputRun({} as never, {} as never, {}),
     ).toEqual({ success: true });
+  });
+
+  it("creates typed factory entries and inline results", () => {
+    class MinimumLevel extends Precondition {
+      public static readonly preconditionName = "MinimumLevel";
+    }
+    const factory = createPreconditionFactory<{ level: number }>(MinimumLevel);
+
+    expect(factory({ level: 5 })).toEqual({
+      context: { level: 5 },
+      name: "MinimumLevel",
+    });
+    expect(preconditionOk()).toEqual({ success: true });
+    expect(preconditionError("DENIED", "No access")).toMatchObject({
+      failure: {
+        identifier: "DENIED",
+        message: "No access",
+      },
+      success: false,
+    });
   });
 });

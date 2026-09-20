@@ -27,9 +27,12 @@ import SubcommandHandler from "../src/subcommand-handler/SubcommandHandler";
 import { CommandDefinitionError } from "../src/errors/CommandDefinitionError";
 import { Precondition } from "../src/preconditions/Precondition";
 import { PreconditionStore } from "../src/preconditions/PreconditionStore";
+import { registerBuiltInPreconditions } from "../src/preconditions/built-ins/BuiltInPreconditions";
 
 const createInstance = () => {
-  return {
+  const instance = {
+    botOwners: ["owner-id"],
+    cooldownStore: {},
     defaultPrefix: "!",
     preconditions: new PreconditionStore(),
     prefixStore: {
@@ -39,6 +42,8 @@ const createInstance = () => {
     testServers: [],
     validations: {},
   };
+  registerBuiltInPreconditions(instance as never, instance.preconditions);
+  return instance;
 };
 
 describe("explicit handler loading", () => {
@@ -227,6 +232,69 @@ describe("explicit handler loading", () => {
     expect(command?.preconditions.entries[0]).toMatchObject({
       name: "Allowed",
     });
+  });
+
+  it("compiles common command flags before explicit preconditions", async () => {
+    const inline = vi.fn(() => true);
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          expectedArgs: "<project>",
+          guildOnly: true,
+          maxArgs: 1,
+          minArgs: 1,
+          ownerOnly: true,
+          permissions: [8n],
+          preconditions: [inline],
+          testOnly: true,
+          type: "LEGACY",
+        },
+        filePath: "/commands/secure.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await handler.load();
+
+    const command = handler.commands.get("secure")!;
+    expect(command.preconditions.entries.slice(0, 5).map((entry: any) => entry.name)).toEqual([
+      "GuildOnly",
+      "OwnerOnly",
+      "TestOnly",
+      "HasPermissions",
+      "ArgumentCount",
+    ]);
+    expect(command.preconditions.entries).toHaveLength(6);
+    expect(command.commandObject.expectedArgs).toBe("<project>");
+  });
+
+  it("rejects ambiguous nested arrays in favor of explicit combinators", async () => {
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          preconditions: [["GuildOnly", "OwnerOnly"]],
+          type: "LEGACY",
+        },
+        filePath: "/commands/secure.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await expect(handler.load()).rejects.toThrow(
+      "Nested arrays are not supported",
+    );
   });
 
   it("rejects unavailable command preconditions during loading", async () => {

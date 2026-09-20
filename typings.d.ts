@@ -360,6 +360,16 @@ export class Precondition {
     command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
+  public messageCommit?(
+    usage: MessageCommandUsage,
+    command: Command,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
+  public chatInputCommit?(
+    usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
   public ok(): PreconditionResult;
   public error(options: PreconditionFailureOptions): PreconditionResult;
 }
@@ -377,12 +387,54 @@ export abstract class AllFlowsPrecondition extends Precondition {
   ): Awaitable<PreconditionResult>;
 }
 
+export interface NamedPreconditionClass {
+  readonly preconditionName: string;
+}
+
+declare const preconditionFactoryEntry: unique symbol;
+export interface PreconditionFactoryEntry<Context extends PreconditionContext> {
+  readonly name: string;
+  readonly context: Context;
+  readonly [preconditionFactoryEntry]: Context;
+}
+
+export function createPreconditionFactory<Context extends PreconditionContext>(
+  precondition: string | NamedPreconditionClass,
+): (context: Context) => PreconditionFactoryEntry<Context>;
+
+export function preconditionOk(): PreconditionResult;
+export function preconditionError(
+  identifier: string,
+  message?: string,
+  context?: Readonly<Record<PropertyKey, unknown>>,
+): PreconditionResult;
+
 export class ArgumentCountPrecondition extends AllFlowsPrecondition {}
 export class GuildOnlyPrecondition extends AllFlowsPrecondition {}
 export class HasPermissionsPrecondition extends AllFlowsPrecondition {}
 export class OwnerOnlyPrecondition extends AllFlowsPrecondition {}
 export class TestOnlyPrecondition extends AllFlowsPrecondition {}
 export class CooldownPrecondition extends AllFlowsPrecondition {}
+
+export interface ArgumentCountContext extends PreconditionContext {
+  expectedArgs?: string;
+  maxArgs?: number;
+  minArgs?: number;
+}
+
+export interface PermissionsContext extends PreconditionContext {
+  permissions: readonly bigint[];
+}
+
+export const ArgumentCount: (
+  context: ArgumentCountContext,
+) => PreconditionFactoryEntry<ArgumentCountContext>;
+export const HasPermissions: (
+  context: PermissionsContext,
+) => PreconditionFactoryEntry<PermissionsContext>;
+export const Cooldown: (
+  context: CooldownPreconditionContext,
+) => PreconditionFactoryEntry<CooldownPreconditionContext>;
 
 export interface PreconditionLookup {
   get(name: string): Precondition | undefined;
@@ -439,11 +491,27 @@ export type PreconditionSingleResolvableDetails = {
 
 export type PreconditionSingleResolvable =
   | SimplePreconditionKeys
-  | PreconditionSingleResolvableDetails;
+  | PreconditionSingleResolvableDetails
+  | PreconditionFactoryEntry<PreconditionContext>
+  | InlinePrecondition;
+
+export type InlinePrecondition = (
+  usage: MessageCommandUsage | ChatInputCommandUsage,
+  command: PreconditionCommand,
+) => Awaitable<boolean | PreconditionResult>;
+
+export interface PreconditionAnyResolvable {
+  any: PreconditionArrayResolvable;
+}
+
+export interface PreconditionAllResolvable {
+  all: PreconditionArrayResolvable;
+}
 
 export type PreconditionEntryResolvable =
   | PreconditionSingleResolvable
-  | readonly PreconditionEntryResolvable[];
+  | PreconditionAnyResolvable
+  | PreconditionAllResolvable;
 
 export type PreconditionArrayResolvable = readonly PreconditionEntryResolvable[];
 
@@ -458,7 +526,25 @@ export interface PreconditionContainer {
     command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionResult>;
+  messageCheck(
+    usage: MessageCommandUsage,
+    command: Command,
+    context?: PreconditionContext,
+  ): Promise<PreconditionCheckResult>;
+  chatInputCheck(
+    usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionCheckResult>;
 }
+
+export type PreconditionCommit = () => Promise<PreconditionResult>;
+export type PreconditionCheckResult =
+  | {
+      readonly success: true;
+      readonly commits: readonly PreconditionCommit[];
+    }
+  | PreconditionFailureResult;
 
 export enum PreconditionRunCondition {
   And = "and",
@@ -482,6 +568,16 @@ export class PreconditionContainerSingle implements PreconditionContainer {
     command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionResult>;
+  public messageCheck(
+    usage: MessageCommandUsage,
+    command: Command,
+    context?: PreconditionContext,
+  ): Promise<PreconditionCheckResult>;
+  public chatInputCheck(
+    usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionCheckResult>;
 }
 
 export class PreconditionContainerArray implements PreconditionContainer {
@@ -490,7 +586,7 @@ export class PreconditionContainerArray implements PreconditionContainer {
   public constructor(
     store: PreconditionLookup,
     data?: PreconditionArrayResolvable,
-    parent?: PreconditionContainerArray | null,
+    runCondition?: PreconditionRunCondition,
   );
   public messageRun(
     usage: MessageCommandUsage,
@@ -502,6 +598,16 @@ export class PreconditionContainerArray implements PreconditionContainer {
     command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionResult>;
+  public messageCheck(
+    usage: MessageCommandUsage,
+    command: Command,
+    context?: PreconditionContext,
+  ): Promise<PreconditionCheckResult>;
+  public chatInputCheck(
+    usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionCheckResult>;
 }
 
 export interface CommandObject {
@@ -511,6 +617,10 @@ export interface CommandObject {
   init?: function;
   description?: string;
   aliases?: string[];
+  testOnly?: boolean;
+  guildOnly?: boolean;
+  ownerOnly?: boolean;
+  permissions?: readonly bigint[];
   deferReply?: DeferSetting;
   minArgs?: number;
   maxArgs?: number;
@@ -544,6 +654,13 @@ export class Command {
 export interface SubcommandObject {
   description: string;
   preconditions?: PreconditionArrayResolvable;
+  testOnly?: boolean;
+  guildOnly?: boolean;
+  ownerOnly?: boolean;
+  permissions?: readonly bigint[];
+  minArgs?: number;
+  maxArgs?: number;
+  expectedArgs?: string;
   delete?: boolean;
 }
 
@@ -553,6 +670,13 @@ export interface SubcommandOptionObject {
   init?: function;
   name: string;
   description?: string;
+  testOnly?: boolean;
+  guildOnly?: boolean;
+  ownerOnly?: boolean;
+  permissions?: readonly bigint[];
+  minArgs?: number;
+  maxArgs?: number;
+  expectedArgs?: string;
   deferReply?: DeferSetting;
   options?: ApplicationCommandOption[];
   autocomplete?: function;

@@ -28,7 +28,7 @@ describe("CooldownPrecondition", () => {
     vi.useRealTimers();
   });
 
-  it("sets an expiry and denies repeated use until it elapses", async () => {
+  it("checks without side effects and claims only during commit", async () => {
     const cooldownStore = new MemoryCooldownStore();
     const precondition = new CooldownPrecondition(
       { cooldownStore } as never,
@@ -39,6 +39,10 @@ describe("CooldownPrecondition", () => {
 
     await expect(
       precondition.chatInputRun(usage as never, command as never, context),
+    ).resolves.toEqual({ success: true });
+    expect(cooldownStore.getCooldown("cooldown:ping:user:user-id")).toBeUndefined();
+    await expect(
+      precondition.chatInputCommit!(usage as never, command as never, context),
     ).resolves.toEqual({ success: true });
     await expect(
       precondition.chatInputRun(usage as never, command as never, context),

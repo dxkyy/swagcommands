@@ -17,6 +17,10 @@ import type {
   PreconditionCommand,
 } from "../preconditions/Precondition";
 import type { PreconditionResult } from "../preconditions/PreconditionResult";
+import type {
+  PreconditionCheckResult,
+  PreconditionCommit,
+} from "../preconditions/containers/PreconditionContainer";
 import SubcommandOption from "../subcommand-handler/SubcommandOption";
 import {
   InteractionResponse,
@@ -53,16 +57,30 @@ class CommandExecutor {
 
     try {
       const preconditionResult = message
-        ? await command.preconditions.messageRun(
+        ? await command.preconditions.messageCheck(
             usage as MessageCommandUsage,
             command,
           )
-        : await command.preconditions.chatInputRun(
+        : await command.preconditions.chatInputCheck(
             usage as ChatInputCommandUsage,
             command,
           );
       if (
         !(await this.handlePreconditionResult(
+          preconditionResult,
+          usage as MessageCommandUsage | ChatInputCommandUsage,
+          command,
+          message,
+          interaction,
+          reply === true,
+          context,
+        ))
+      ) {
+        return;
+      }
+
+      if (
+        !(await this.runPreconditionCommits(
           preconditionResult,
           usage as MessageCommandUsage | ChatInputCommandUsage,
           command,
@@ -127,7 +145,7 @@ class CommandExecutor {
     const usage = this.createSubcommandUsage(command, args, interaction);
 
     try {
-      const rootResult = await command.parent.preconditions.chatInputRun(
+      const rootResult = await command.parent.preconditions.chatInputCheck(
         usage as ChatInputCommandUsage,
         command.parent,
       );
@@ -145,12 +163,35 @@ class CommandExecutor {
         return;
       }
 
-      const optionResult = await command.preconditions.chatInputRun(
+      const optionResult = await command.preconditions.chatInputCheck(
         usage as ChatInputCommandUsage,
         command,
       );
       if (
         !(await this.handlePreconditionResult(
+          optionResult,
+          usage as ChatInputCommandUsage,
+          command,
+          null,
+          interaction,
+          false,
+          context,
+        ))
+      ) {
+        return;
+      }
+
+      if (
+        !(await this.runPreconditionCommits(
+          rootResult,
+          usage as ChatInputCommandUsage,
+          command.parent,
+          null,
+          interaction,
+          false,
+          context,
+        )) ||
+        !(await this.runPreconditionCommits(
           optionResult,
           usage as ChatInputCommandUsage,
           command,
@@ -231,6 +272,40 @@ class CommandExecutor {
     }
 
     return false;
+  }
+
+  private async runPreconditionCommits(
+    check: PreconditionCheckResult,
+    usage: MessageCommandUsage | ChatInputCommandUsage,
+    command: PreconditionCommand,
+    message: Message | null,
+    interaction: CommandInteraction | null,
+    reply: boolean,
+    context: {
+      commandName: string;
+      invocationKind: "message" | "interaction";
+      subcommandName?: string;
+    },
+  ): Promise<boolean> {
+    if (!check.success) return false;
+
+    for (const commit of check.commits as readonly PreconditionCommit[]) {
+      const result = await commit();
+      if (
+        !(await this.handlePreconditionResult(
+          result,
+          usage,
+          command,
+          message,
+          interaction,
+          reply,
+          context,
+        ))
+      ) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private async reportExecutionError(

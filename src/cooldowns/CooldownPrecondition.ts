@@ -5,7 +5,10 @@ import type {
   PreconditionCommand,
   PreconditionContext,
 } from "../preconditions/Precondition";
-import { AllFlowsPrecondition } from "../preconditions/Precondition";
+import {
+  AllFlowsPrecondition,
+  createPreconditionFactory,
+} from "../preconditions/Precondition";
 
 type CooldownUsage = MessageCommandUsage | ChatInputCommandUsage;
 
@@ -21,6 +24,10 @@ export interface CooldownPreconditionContext extends PreconditionContext {
   id?: string;
   scope?: CooldownScope;
 }
+
+export const Cooldown = createPreconditionFactory<CooldownPreconditionContext>(
+  "Cooldown",
+);
 
 export function createCooldownId(
   command: PreconditionCommand,
@@ -56,6 +63,22 @@ export class CooldownPrecondition extends AllFlowsPrecondition {
     return this.run(usage, command, context);
   }
 
+  public messageCommit(
+    usage: MessageCommandUsage,
+    command: Command,
+    context: CooldownPreconditionContext,
+  ) {
+    return this.commit(usage, command, context);
+  }
+
+  public chatInputCommit(
+    usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context: CooldownPreconditionContext,
+  ) {
+    return this.commit(usage, command, context);
+  }
+
   private async run(
     usage: CooldownUsage,
     command: PreconditionCommand,
@@ -80,25 +103,55 @@ export class CooldownPrecondition extends AllFlowsPrecondition {
     }
 
     const now = Date.now();
+    const expiresAt = await this.instance.cooldownStore.getCooldown(cooldownId);
+    if (expiresAt !== undefined && expiresAt > now) {
+      return this.error({
+        context: {
+          cooldownId,
+          expiresAt,
+          remaining: expiresAt - now,
+          scope,
+        },
+        identifier: "COOLDOWN_ACTIVE",
+        message: `This command is on cooldown for another ${expiresAt - now}ms.`,
+      });
+    }
+
+    return this.ok();
+  }
+
+  private async commit(
+    usage: CooldownUsage,
+    command: PreconditionCommand,
+    context: CooldownPreconditionContext,
+  ) {
+    const { duration, id, scope = CooldownScope.User } = context;
+    const cooldownId = createCooldownId(command, usage, scope, id);
+    if (!cooldownId || !Number.isFinite(duration) || duration <= 0) {
+      return this.error({
+        identifier: "COOLDOWN_COMMIT_INVALID",
+        message: "The cooldown could not be committed.",
+      });
+    }
+
+    const now = Date.now();
     const claim = await this.instance.cooldownStore.claimCooldown(
       cooldownId,
       now + duration,
       now,
     );
-    if (!claim.acquired) {
-      return this.error({
-        context: {
-          cooldownId,
-          expiresAt: claim.expiresAt,
-          remaining: claim.expiresAt - now,
-          scope,
-        },
-        identifier: "COOLDOWN_ACTIVE",
-        message: `This command is on cooldown for another ${claim.expiresAt - now}ms.`,
-      });
-    }
-
-    return this.ok();
+    return claim.acquired
+      ? this.ok()
+      : this.error({
+          context: {
+            cooldownId,
+            expiresAt: claim.expiresAt,
+            remaining: claim.expiresAt - now,
+            scope,
+          },
+          identifier: "COOLDOWN_ACTIVE",
+          message: `This command is on cooldown for another ${claim.expiresAt - now}ms.`,
+        });
   }
 }
 

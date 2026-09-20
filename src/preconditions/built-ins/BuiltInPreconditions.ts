@@ -6,7 +6,10 @@ import type {
   PreconditionCommand,
   PreconditionContext,
 } from "../Precondition";
-import { AllFlowsPrecondition } from "../Precondition";
+import {
+  AllFlowsPrecondition,
+  createPreconditionFactory,
+} from "../Precondition";
 import type { PreconditionStore } from "../PreconditionStore";
 import type Command from "../../command-handler/Command";
 import type SWAG from "../../../typings";
@@ -14,15 +17,22 @@ import { CooldownPrecondition } from "../../cooldowns/CooldownPrecondition";
 
 type Usage = MessageCommandUsage | ChatInputCommandUsage;
 
-interface ArgumentCountContext extends PreconditionContext {
+export interface ArgumentCountContext extends PreconditionContext {
   expectedArgs?: string;
   maxArgs?: number;
   minArgs?: number;
 }
 
-interface PermissionsContext extends PreconditionContext {
+export interface PermissionsContext extends PreconditionContext {
   permissions: readonly bigint[];
 }
+
+export const ArgumentCount = createPreconditionFactory<ArgumentCountContext>(
+  "ArgumentCount",
+);
+export const HasPermissions = createPreconditionFactory<PermissionsContext>(
+  "HasPermissions",
+);
 
 abstract class SharedFlowPrecondition extends AllFlowsPrecondition {
   public messageRun(
@@ -94,8 +104,15 @@ export class HasPermissionsPrecondition extends SharedFlowPrecondition {
     _command: PreconditionCommand,
     context: PermissionsContext,
   ) {
+    if (!usage.guild || !usage.member) {
+      return this.error({
+        identifier: "GUILD_REQUIRED",
+        message: "This command can only be used in a server.",
+      });
+    }
+
     const missingPermissions = context.permissions.filter(
-      (permission) => !usage.member?.permissions.has(permission),
+      (permission) => !usage.member!.permissions.has(permission),
     );
     if (missingPermissions.length === 0) {
       return this.ok();

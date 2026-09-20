@@ -11,6 +11,7 @@ import {
   PreconditionFailureOptions,
   PreconditionResult,
 } from "./PreconditionResult";
+import type { PreconditionSingleResolvableDetails } from "./containers/PreconditionContainer";
 
 export type Awaitable<T> = T | Promise<T>;
 
@@ -53,6 +54,18 @@ export class Precondition {
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
 
+  public messageCommit?(
+    usage: MessageCommandUsage,
+    command: Command,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
+
+  public chatInputCommit?(
+    usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
+
   public ok(): PreconditionResult {
     return createPreconditionSuccess();
   }
@@ -74,4 +87,34 @@ export abstract class AllFlowsPrecondition extends Precondition {
     command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
+}
+
+export interface NamedPreconditionClass {
+  readonly preconditionName: string;
+}
+
+export function createPreconditionFactory<Context extends PreconditionContext>(
+  precondition: string | NamedPreconditionClass,
+): (context: Context) => PreconditionSingleResolvableDetails {
+  const name = typeof precondition === "string"
+    ? precondition
+    : precondition.preconditionName;
+
+  return (context) => ({ name, context });
+}
+
+export function preconditionOk(): PreconditionResult {
+  return createPreconditionSuccess();
+}
+
+export function preconditionError(
+  identifier: string,
+  message?: string,
+  context?: Readonly<Record<PropertyKey, unknown>>,
+): PreconditionResult {
+  return createPreconditionFailure("InlinePrecondition", {
+    context,
+    identifier,
+    message,
+  });
 }

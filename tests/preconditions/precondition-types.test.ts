@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { PreconditionArrayResolvable } from "../../typings";
+import type {
+  PreconditionArrayResolvable,
+  PreconditionFactoryEntry,
+} from "../../typings";
 
 declare module "../../typings" {
   interface Preconditions {
@@ -14,7 +17,15 @@ declare module "../../typings" {
 const validPreconditions: PreconditionArrayResolvable = [
   "OwnerOnly",
   { name: "MinimumLevel", context: { level: 3 } },
-  ["OwnerOnly", { name: "MinimumLevel", context: { level: 5 } }],
+  { any: ["OwnerOnly", { name: "MinimumLevel", context: { level: 5 } }] },
+];
+
+const MinimumLevel = (context: { level: number }) =>
+  ({ name: "MinimumLevel", context }) as PreconditionFactoryEntry<{
+    level: number;
+  }>;
+const factoryPreconditions: PreconditionArrayResolvable = [
+  MinimumLevel({ level: 10 }),
 ];
 
 // @ts-expect-error Preconditions with context cannot use the string shorthand.
@@ -36,5 +47,6 @@ describe("precondition declaration types", () => {
     expect(missingContext).toBeDefined();
     expect(unexpectedContext).toBeDefined();
     expect(invalidContext).toBeDefined();
+    expect(factoryPreconditions).toHaveLength(1);
   });
 });

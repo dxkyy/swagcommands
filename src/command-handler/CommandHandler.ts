@@ -12,6 +12,7 @@ import PrefixHandler from "./PrefixHandler";
 import SWAG, { CommandObject } from "../../typings";
 import CommandExecutor from "../execution/CommandExecutor";
 import { resolveCommandPreconditions } from "../preconditions/resolve-command-preconditions";
+import { compileCommandPreconditions } from "../preconditions/compile-command-preconditions";
 
 class CommandHandler {
   // <commandName, instance of the Command class>
@@ -72,7 +73,7 @@ class CommandHandler {
 
       const preconditions = resolveCommandPreconditions(
         this._instance.preconditions,
-        commandObject.preconditions,
+        compileCommandPreconditions(commandObject),
         {
           commandName,
           commandType: commandObject.type,

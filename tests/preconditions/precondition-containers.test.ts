@@ -51,18 +51,18 @@ describe("precondition containers", () => {
     expect(third.run).not.toHaveBeenCalled();
   });
 
-  it("alternates nested groups between OR and AND", async () => {
+  it("uses explicit any and all combinators", async () => {
     const store = createStore();
     const denied = register(store, "Denied", false);
     const firstAllowed = register(store, "FirstAllowed", true);
     const secondAllowed = register(store, "SecondAllowed", true);
     const neverReached = register(store, "NeverReached", true);
     const container = new PreconditionContainerArray(store, [
-      [
+      { any: [
         "Denied",
-        ["FirstAllowed", "SecondAllowed"],
+        { all: ["FirstAllowed", "SecondAllowed"] },
         "NeverReached",
-      ],
+      ] },
     ]);
 
     const result = await container.chatInputRun({} as never, {} as never);
@@ -79,7 +79,7 @@ describe("precondition containers", () => {
     register(store, "First", false);
     register(store, "Second", false);
     const container = new PreconditionContainerArray(store, [
-      ["First", "Second"],
+      { any: ["First", "Second"] },
     ]);
 
     const result = await container.messageRun({} as never, {} as never);
@@ -155,7 +155,47 @@ describe("precondition containers", () => {
       ),
     ).resolves.toEqual({ success: true });
     expect(
-      () => new PreconditionContainerArray(store, [[]]),
+      () => new PreconditionContainerArray(store, [{ any: [] }]),
     ).toThrow("A nested precondition group cannot be empty.");
+  });
+
+  it("supports cheap inline checks", async () => {
+    const store = createStore();
+    const allowed = vi.fn(() => true);
+    const denied = vi.fn(() => false);
+    const container = new PreconditionContainerArray(store, [allowed, denied]);
+
+    await expect(
+      container.messageRun({ message: {} } as never, { commandName: "test" } as never),
+    ).resolves.toMatchObject({
+      failure: { identifier: "INLINE_PRECONDITION_FAILED" },
+      success: false,
+    });
+    expect(allowed).toHaveBeenCalledOnce();
+    expect(denied).toHaveBeenCalledOnce();
+  });
+
+  it("commits only the successful branch of an any group", async () => {
+    const store = createStore();
+    const denied = register(store, "Denied", false);
+    const selected = register(store, "Selected", true);
+    const skipped = register(store, "Skipped", true);
+    const selectedCommit = vi.fn(() => selected.precondition.ok());
+    const skippedCommit = vi.fn(() => skipped.precondition.ok());
+    selected.precondition.messageCommit = selectedCommit;
+    skipped.precondition.messageCommit = skippedCommit;
+    const container = new PreconditionContainerArray(store, [
+      { any: ["Denied", "Selected", "Skipped"] },
+    ]);
+
+    const result = await container.messageCheck({} as never, {} as never);
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected the any group to pass.");
+    await Promise.all(result.commits.map((commit) => commit()));
+    expect(denied.run).toHaveBeenCalledOnce();
+    expect(selectedCommit).toHaveBeenCalledOnce();
+    expect(skipped.run).not.toHaveBeenCalled();
+    expect(skippedCommit).not.toHaveBeenCalled();
   });
 });

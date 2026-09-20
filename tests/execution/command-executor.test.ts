@@ -171,4 +171,32 @@ describe("central command execution", () => {
       },
     });
   });
+
+  it("does not commit a stateful precondition when a later check fails", async () => {
+    const { executor, instance } = createExecutor();
+    const commit = vi.fn(() => ({ success: true as const }));
+    const stateful = new Precondition(instance, "Stateful");
+    stateful.chatInputRun = () => stateful.ok();
+    stateful.chatInputCommit = commit;
+    const denied = new Precondition(instance, "Denied");
+    denied.chatInputRun = () =>
+      denied.error({ identifier: "DENIED", message: "Denied" });
+    const store = new PreconditionStore();
+    store.register(stateful).register(denied);
+    const root = new PreconditionContainerArray(store, [
+      "Stateful",
+      "Denied",
+    ]);
+    const callback = vi.fn();
+    const command = createSubcommand(instance, callback, root);
+
+    await executor.executeSubcommand(
+      command,
+      [],
+      createInteraction() as never,
+    );
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(callback).not.toHaveBeenCalled();
+  });
 });

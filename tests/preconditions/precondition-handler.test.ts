@@ -64,6 +64,26 @@ describe("PreconditionHandler", () => {
     );
   });
 
+  it("uses an explicit class name instead of coupling identity to the filename", async () => {
+    class RenamedFile extends Precondition {
+      public static readonly preconditionName = "MinimumLevel";
+    }
+    loading.files.push({
+      fileContents: RenamedFile,
+      filePath: "/preconditions/check-level.ts",
+    });
+    const store = new PreconditionStore();
+
+    await new PreconditionHandler(
+      {} as never,
+      "/preconditions",
+      store,
+    ).load();
+
+    expect(store.get("MinimumLevel")).toBeInstanceOf(RenamedFile);
+    expect(store.has("check-level")).toBe(false);
+  });
+
   it("rejects duplicate names even when they come from different folders", async () => {
     class First extends Precondition {}
     class Second extends Precondition {}
