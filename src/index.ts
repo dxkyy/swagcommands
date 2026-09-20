@@ -24,6 +24,13 @@ import {
   PreconditionRunCondition,
 } from "./preconditions/containers/PreconditionContainerArray";
 import { PreconditionContainerSingle } from "./preconditions/containers/PreconditionContainerSingle";
+import {
+  ArgumentCountPrecondition,
+  GuildOnlyPrecondition,
+  HasPermissionsPrecondition,
+  OwnerOnlyPrecondition,
+  TestOnlyPrecondition,
+} from "./preconditions/built-ins/BuiltInPreconditions";
 
 module.exports = SWAG;
 module.exports.CommandType = CommandType;
@@ -48,3 +55,8 @@ module.exports.PreconditionContainerSingle = PreconditionContainerSingle;
 module.exports.PreconditionHandler = PreconditionHandler;
 module.exports.PreconditionRunCondition = PreconditionRunCondition;
 module.exports.PreconditionStore = PreconditionStore;
+module.exports.ArgumentCountPrecondition = ArgumentCountPrecondition;
+module.exports.GuildOnlyPrecondition = GuildOnlyPrecondition;
+module.exports.HasPermissionsPrecondition = HasPermissionsPrecondition;
+module.exports.OwnerOnlyPrecondition = OwnerOnlyPrecondition;
+module.exports.TestOnlyPrecondition = TestOnlyPrecondition;

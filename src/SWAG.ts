@@ -20,6 +20,7 @@ import ResponseHandler from "./execution/ResponseHandler";
 import CommandExecutor from "./execution/CommandExecutor";
 import { PreconditionHandler } from "./preconditions/PreconditionHandler";
 import { PreconditionStore } from "./preconditions/PreconditionStore";
+import { registerBuiltInPreconditions } from "./preconditions/built-ins/BuiltInPreconditions";
 
 export const logger = new Logger();
 
@@ -59,6 +60,10 @@ class SWAGCommands {
     };
     this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
     this._preconditions = new PreconditionStore();
+    registerBuiltInPreconditions(
+      this as unknown as SWAG,
+      this._preconditions,
+    );
     this._responseHandler = new ResponseHandler(this);
     this._commandExecutor = new CommandExecutor(this as unknown as SWAG);
   }

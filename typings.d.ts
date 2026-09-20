@@ -327,6 +327,12 @@ export abstract class AllFlowsPrecondition extends Precondition {
   ): Awaitable<PreconditionResult>;
 }
 
+export class ArgumentCountPrecondition extends AllFlowsPrecondition {}
+export class GuildOnlyPrecondition extends AllFlowsPrecondition {}
+export class HasPermissionsPrecondition extends AllFlowsPrecondition {}
+export class OwnerOnlyPrecondition extends AllFlowsPrecondition {}
+export class TestOnlyPrecondition extends AllFlowsPrecondition {}
+
 export interface PreconditionLookup {
   get(name: string): Precondition | undefined;
 }
@@ -353,7 +359,19 @@ export class PreconditionHandler {
   public load(): Promise<void>;
 }
 
-export interface Preconditions {}
+export interface Preconditions {
+  ArgumentCount: {
+    expectedArgs?: string;
+    maxArgs?: number;
+    minArgs?: number;
+  };
+  GuildOnly: never;
+  HasPermissions: {
+    permissions: readonly bigint[];
+  };
+  OwnerOnly: never;
+  TestOnly: never;
+}
 
 export type PreconditionKeys = keyof Preconditions & string;
 
@@ -441,10 +459,6 @@ export interface CommandObject {
   init?: function;
   description?: string;
   aliases?: string[];
-  testOnly?: boolean; // can be precondition
-  guildOnly?: boolean; // can be precondition
-  ownerOnly?: boolean; // can be precondition
-  permissions?: bigint[]; // can be precondition
   deferReply?: DeferSetting;
   minArgs?: number;
   maxArgs?: number;
@@ -478,9 +492,6 @@ export class Command {
 export interface SubcommandObject {
   description: string;
   preconditions?: PreconditionArrayResolvable;
-  testOnly?: boolean;
-  guildOnly?: boolean;
-  ownerOnly?: boolean;
   delete?: boolean;
 }
 
@@ -490,8 +501,6 @@ export interface SubcommandOptionObject {
   init?: function;
   name: string;
   description?: string;
-  ownerOnly?: boolean;
-  permissions?: bigint[];
   deferReply?: DeferSetting;
   options?: ApplicationCommandOption[];
   autocomplete?: function;
