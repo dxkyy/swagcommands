@@ -1,5 +1,5 @@
 import {
-  ApplicationCommandOption,
+  ApplicationCommandOptionData,
   Client,
   CommandInteraction,
   Guild,
@@ -626,7 +626,7 @@ export interface CommandObject {
   maxArgs?: number;
   correctSyntax?: string;
   expectedArgs?: string;
-  options?: ApplicationCommandOption[];
+  options?: ApplicationCommandOptionData[];
   autocomplete?: function;
   reply?: boolean;
   delete?: boolean;
@@ -678,7 +678,7 @@ export interface SubcommandOptionObject {
   maxArgs?: number;
   expectedArgs?: string;
   deferReply?: DeferSetting;
-  options?: ApplicationCommandOption[];
+  options?: ApplicationCommandOptionData[];
   autocomplete?: function;
   reply?: boolean;
 }
