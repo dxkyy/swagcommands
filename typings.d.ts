@@ -274,7 +274,7 @@ export type ChatInputCommandUsage =
       interaction: CommandInteraction;
     });
 
-export type PreconditionCommand = Command | SubcommandOption;
+export type PreconditionCommand = Command | Subcommand | SubcommandOption;
 
 export class Precondition {
   public readonly instance: SWAG;
@@ -457,6 +457,7 @@ export class Command {
 
 export interface SubcommandObject {
   description: string;
+  preconditions?: PreconditionArrayResolvable;
   testOnly?: boolean;
   guildOnly?: boolean;
   ownerOnly?: boolean;
@@ -465,6 +466,7 @@ export interface SubcommandObject {
 
 export interface SubcommandOptionObject {
   callback: (commandUsage: SubCommandUsage) => Awaitable<CommandResponse | void>;
+  preconditions?: PreconditionArrayResolvable;
   init?: function;
   name: string;
   description?: string;
@@ -480,6 +482,16 @@ export class SubcommandOption {
   public get instance(): SWAG;
   public get commandName(): string;
   public get optionObject(): SubcommandOptionObject;
+  public get parent(): Subcommand;
+  public get preconditions(): PreconditionContainerArray;
+}
+
+export class Subcommand {
+  public get instance(): SWAG;
+  public get commandName(): string;
+  public get commandObject(): SubcommandObject;
+  public get options(): SubcommandOption[];
+  public get preconditions(): PreconditionContainerArray;
 }
 
 export { CommandObject, Command, CommandType };

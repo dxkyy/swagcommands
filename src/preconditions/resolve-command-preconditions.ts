@@ -1,4 +1,7 @@
-import type { CommandObject } from "../../typings";
+import type {
+  CommandObject,
+  PreconditionArrayResolvable as DeclaredPreconditionArrayResolvable,
+} from "../../typings";
 import type CommandType from "../util/CommandType";
 import { CommandDefinitionError } from "../errors/CommandDefinitionError";
 import {
@@ -16,10 +19,46 @@ interface ResolveCommandPreconditionsOptions {
   filePath?: string;
 }
 
+interface ResolveChatInputPreconditionsOptions {
+  commandName: string;
+  filePath?: string;
+  subcommandName?: string;
+}
+
+interface ResolvePreconditionsOptions
+  extends ResolveChatInputPreconditionsOptions {
+  requireChatInput: boolean;
+  requireMessage: boolean;
+}
+
 export function resolveCommandPreconditions(
   store: PreconditionLookup,
   entries: CommandObject["preconditions"],
   options: ResolveCommandPreconditionsOptions,
+): PreconditionContainerArray {
+  return resolvePreconditions(store, entries, {
+    ...options,
+    requireChatInput: options.commandType !== "LEGACY",
+    requireMessage: options.commandType !== "SLASH",
+  });
+}
+
+export function resolveChatInputPreconditions(
+  store: PreconditionLookup,
+  entries: DeclaredPreconditionArrayResolvable | undefined,
+  options: ResolveChatInputPreconditionsOptions,
+): PreconditionContainerArray {
+  return resolvePreconditions(store, entries, {
+    ...options,
+    requireChatInput: true,
+    requireMessage: false,
+  });
+}
+
+function resolvePreconditions(
+  store: PreconditionLookup,
+  entries: DeclaredPreconditionArrayResolvable | undefined,
+  options: ResolvePreconditionsOptions,
 ): PreconditionContainerArray {
   if (entries !== undefined && !Array.isArray(entries)) {
     throw definitionError(options, "Preconditions must be an array.");
@@ -34,7 +73,7 @@ export function resolveCommandPreconditions(
 function validateEntries(
   store: PreconditionLookup,
   entries: PreconditionArrayResolvable,
-  options: ResolveCommandPreconditionsOptions,
+  options: ResolvePreconditionsOptions,
   depth: number,
 ): void {
   if (depth > 0 && entries.length === 0) {
@@ -70,7 +109,7 @@ function validateEntries(
 function validateSingle(
   store: PreconditionLookup,
   entry: string | PreconditionSingleResolvableDetails,
-  options: ResolveCommandPreconditionsOptions,
+  options: ResolvePreconditionsOptions,
 ): void {
   const name = typeof entry === "string" ? entry : entry.name;
   if (!name) {
@@ -99,7 +138,7 @@ function validateSingle(
   }
 
   if (
-    options.commandType !== "SLASH" &&
+    options.requireMessage &&
     typeof precondition.messageRun !== "function"
   ) {
     throw definitionError(
@@ -109,7 +148,7 @@ function validateSingle(
   }
 
   if (
-    options.commandType !== "LEGACY" &&
+    options.requireChatInput &&
     typeof precondition.chatInputRun !== "function"
   ) {
     throw definitionError(
@@ -120,14 +159,19 @@ function validateSingle(
 }
 
 function definitionError(
-  options: ResolveCommandPreconditionsOptions,
+  options: ResolveChatInputPreconditionsOptions,
   message: string,
 ): CommandDefinitionError {
+  const commandIdentity = options.subcommandName
+    ? `${options.commandName}/${options.subcommandName}`
+    : options.commandName;
+
   return new CommandDefinitionError(
-    `Command "${options.commandName}" has invalid preconditions: ${message}`,
+    `Command "${commandIdentity}" has invalid preconditions: ${message}`,
     {
       commandName: options.commandName,
       filePath: options.filePath,
+      subcommandName: options.subcommandName,
     },
   );
 }

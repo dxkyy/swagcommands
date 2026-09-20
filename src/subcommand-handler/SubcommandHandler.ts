@@ -15,6 +15,7 @@ import SWAG, {
   SubcommandOptionObject,
 } from "../../typings";
 import CommandExecutor from "../execution/CommandExecutor";
+import { resolveChatInputPreconditions } from "../preconditions/resolve-command-preconditions";
 
 class CommandHandler {
   // <commandName, instance of the Command class>
@@ -88,22 +89,42 @@ class CommandHandler {
         }
 
         const optionObject: SubcommandOptionObject = option.fileContents;
+        const preconditions = resolveChatInputPreconditions(
+          this._instance.preconditions,
+          optionObject.preconditions,
+          {
+            commandName,
+            filePath,
+            subcommandName: optionName,
+          },
+        );
 
         const subCommandOption = new SubcommandOption(
           this._instance,
           optionName,
           optionObject,
+          preconditions,
         );
         optionDatas.push(subCommandOption);
       }
 
-      const commandObject: SubcommandObject = require(filePath).default;
+      const commandObject: SubcommandObject =
+        index?.fileContents ?? require(filePath).default;
+      const preconditions = resolveChatInputPreconditions(
+        this._instance.preconditions,
+        commandObject.preconditions,
+        {
+          commandName,
+          filePath: index?.filePath ?? filePath,
+        },
+      );
 
       const command = new Subcommand(
         this._instance,
         commandName,
         commandObject,
         optionDatas,
+        preconditions,
       );
 
       const { delete: del } = commandObject;

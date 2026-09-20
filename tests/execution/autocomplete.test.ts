@@ -84,16 +84,22 @@ describe("autocomplete execution", () => {
 
   it("resolves autocomplete callbacks on subcommands", async () => {
     const autocomplete = vi.fn().mockResolvedValue(["ban", "block"]);
-    const option = new SubcommandOption({} as never, "user", {
-      autocomplete,
-      callback: vi.fn(),
-      name: "user",
-    });
+    const option = new SubcommandOption(
+      {} as never,
+      "user",
+      {
+        autocomplete,
+        callback: vi.fn(),
+        name: "user",
+      },
+      createPreconditions(),
+    );
     const command = new Subcommand(
       {} as never,
       "admin",
       { description: "Administration" },
       [option],
+      createPreconditions(),
     );
     const interaction = createInteraction("admin", "b");
     interaction.options.data = [{ name: "user" }];

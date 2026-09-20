@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import CommandExecutor from "../../src/execution/CommandExecutor";
 import ResponseHandler from "../../src/execution/ResponseHandler";
 import SubcommandOption from "../../src/subcommand-handler/SubcommandOption";
+import Subcommand from "../../src/subcommand-handler/Subcommand";
+import { PreconditionStore } from "../../src/preconditions/PreconditionStore";
+import { PreconditionContainerArray } from "../../src/preconditions/containers/PreconditionContainerArray";
 
 const createInteraction = () => ({
   channel: {},
@@ -36,6 +39,26 @@ const createExecutor = () => {
   };
 };
 
+const createSubcommand = (instance: any, callback: any) => {
+  const option = new SubcommandOption(
+    instance,
+    "ban",
+    {
+      callback,
+      name: "ban",
+    },
+    new PreconditionContainerArray(new PreconditionStore()),
+  );
+  new Subcommand(
+    instance,
+    "admin",
+    { description: "Administration" },
+    [option],
+    new PreconditionContainerArray(new PreconditionStore()),
+  );
+  return option;
+};
+
 describe("central command execution", () => {
   it("runs subcommand validation, callback, and response in one pipeline", async () => {
     const response = {
@@ -49,10 +72,7 @@ describe("central command execution", () => {
       get: vi.fn().mockResolvedValue("!"),
     };
     const { executor, instance } = createExecutor();
-    const command = new SubcommandOption(instance, "ban", {
-      callback,
-      name: "ban",
-    });
+    const command = createSubcommand(instance, callback);
 
     await executor.executeSubcommand(
       command,
@@ -81,10 +101,7 @@ describe("central command execution", () => {
     const validation = vi.fn().mockResolvedValue(false);
     const interaction = createInteraction();
     const { executor, instance } = createExecutor();
-    const command = new SubcommandOption(instance, "ban", {
-      callback,
-      name: "ban",
-    });
+    const command = createSubcommand(instance, callback);
 
     await executor.executeSubcommand(
       command,

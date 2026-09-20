@@ -107,7 +107,7 @@ class CommandExecutor {
   ): Promise<void> {
     const { callback, deferReply } = command.optionObject;
     const context = {
-      commandName: interaction.commandName,
+      commandName: command.parent.commandName,
       invocationKind: "interaction" as const,
       subcommandName: command.commandName,
     };
