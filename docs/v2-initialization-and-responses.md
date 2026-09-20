@@ -38,7 +38,7 @@ swag.state; // "ready" after SWAG.create() resolves
 swag.isReady(); // true
 ```
 
-Initialization no longer creates, updates, or deletes Discord application commands. Command loading is local-only in v2. Slash-command deployment will be handled separately as part of [issue #68](https://github.com/dxkyy/swagcommands/issues/68).
+Initialization no longer creates, updates, or deletes Discord application commands. Command loading is local-only in v2. After the Discord client is ready, synchronize application commands explicitly with `swag.deployCommands()`. See [V2 command deployment and migration](v2-command-deployment.md) for scope, deletion, clearing, and migration behavior.
 
 Supply `botOwners` explicitly when using the `OwnerOnly` precondition. This keeps local initialization independent from Discord application-owner lookups.
 
@@ -122,8 +122,8 @@ const swag = await SWAG.create({
 Every framework error extends `SwagError` and includes:
 
 - `code`: a stable, machine-readable error code
-- `phase`: `initialization`, `validation`, `execution`, `response`,
-  `autocomplete`, or `event`
+- `phase`: `initialization`, `deployment`, `validation`, `execution`,
+  `response`, `autocomplete`, or `event`
 - `context`: relevant command, subcommand, event, file, and invocation details
 - `cause`: the original failure, when one exists
 
@@ -147,7 +147,8 @@ SWAGCommands filters those strings against the focused value, limits the result 
 - Catch rejected initialization or let it fail application startup explicitly.
 - Provide `botOwners` when any command or subcommand uses the `OwnerOnly` precondition.
 - Keep common guard fields as v2 precondition sugar, and move functions from `validations.runtime` to [inline or reusable preconditions](v2-preconditions-and-cooldowns.md).
-- Move slash-command deployment out of command loading.
+- Move slash-command deployment out of command loading and call `deployCommands()` only after the Discord client is ready. See [V2 command deployment and migration](v2-command-deployment.md).
+- Remove `delete: true` tombstones; remove the definition and synchronize its scope instead.
 - Use `deferReply: { ephemeral: true }` for ephemeral deferrals.
 - Add `onError` when the application needs custom logging or reporting.
 - Keep returning Discord.js strings and payload objects from callbacks as before.

@@ -23,6 +23,15 @@ import { PreconditionStore } from "./preconditions/PreconditionStore";
 import { registerBuiltInPreconditions } from "./preconditions/built-ins/BuiltInPreconditions";
 import { CooldownStore } from "./cooldowns/CooldownStore";
 import { MemoryCooldownStore } from "./cooldowns/MemoryCooldownStore";
+import {
+  ClearCommandsTarget,
+  CommandDeployer,
+  CommandDeploymentResult,
+  CommandDeploymentTargetError,
+  DeployCommandsOptions,
+} from "./deployment/CommandDeployer";
+import { CommandDeploymentError } from "./errors/CommandDeploymentError";
+import { CommandDefinitionError } from "./errors/CommandDefinitionError";
 
 export const logger = new Logger();
 
@@ -47,6 +56,7 @@ class SWAGCommands {
   private _cooldownStore: CooldownStore;
   private _preconditions: PreconditionStore;
   private _preconditionHandler: PreconditionHandler | undefined;
+  private _commandDeployer!: CommandDeployer;
   private _state: LifecycleState = "idle";
   private _initialization: Promise<void> | undefined;
   private readonly _options: Options;
@@ -161,7 +171,6 @@ class SWAGCommands {
       this._subcommandHandler = new SubcommandHandler(
         this as unknown as SWAG,
         subcommandsDir,
-        client,
         this._commandExecutor,
       );
       await this._subcommandHandler.load();
@@ -183,6 +192,19 @@ class SWAGCommands {
     );
     await this._eventHandler.load();
     this._eventHandler.registerEvents();
+
+    this._commandDeployer = new CommandDeployer(
+      client,
+      () => {
+        const commands = this._commandHandler?.commands;
+        const subcommands = this._subcommandHandler?.commands;
+        return {
+          commands: commands?.values(),
+          subcommands: subcommands?.values(),
+        };
+      },
+      testServers,
+    );
   }
 
   public get client(): Client {
@@ -245,6 +267,27 @@ class SWAGCommands {
     return this._responseHandler;
   }
 
+  public async deployCommands(
+    options: DeployCommandsOptions = {},
+  ): Promise<CommandDeploymentResult> {
+    try {
+      return await this._commandDeployer.deploy(options);
+    } catch (error) {
+      if (error instanceof CommandDefinitionError) {
+        throw error;
+      }
+      throw this.createCommandDeploymentError(error);
+    }
+  }
+
+  public async clearCommands(target: ClearCommandsTarget): Promise<void> {
+    try {
+      await this._commandDeployer.clear(target);
+    } catch (error) {
+      throw this.createCommandDeploymentError(error);
+    }
+  }
+
   public async reportError(error: SwagError): Promise<void> {
     if (this._options.onError) {
       await this._options.onError(error, error.context as ErrorContext);
@@ -271,6 +314,27 @@ class SWAGCommands {
           flags: MessageFlags.Ephemeral,
         }
       : event.failure.message;
+  }
+
+  private createCommandDeploymentError(error: unknown): CommandDeploymentError {
+    if (error instanceof CommandDeploymentError) {
+      return error;
+    }
+
+    if (error instanceof CommandDeploymentTargetError) {
+      return new CommandDeploymentError(error.cause ?? error, {
+        completedTargets: error.completedTargets,
+        context:
+          error.target.scope === "global"
+            ? { deploymentScope: "global" }
+            : {
+                deploymentScope: "guild",
+                guildId: error.target.guildId,
+              },
+      });
+    }
+
+    return new CommandDeploymentError(error);
   }
 }
 
