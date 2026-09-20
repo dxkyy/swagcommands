@@ -113,6 +113,31 @@ export type MessageResponse =
 
 export type CommandResponse = InteractionResponse | MessageResponse;
 
+export type PreconditionContext = Readonly<Record<PropertyKey, unknown>>;
+
+export interface PreconditionFailureOptions {
+  identifier: string;
+  message?: string;
+  context?: Readonly<Record<PropertyKey, unknown>>;
+}
+
+export interface PreconditionFailure extends PreconditionFailureOptions {
+  preconditionName: string;
+}
+
+export interface PreconditionSuccessResult {
+  readonly success: true;
+}
+
+export interface PreconditionFailureResult {
+  readonly success: false;
+  readonly failure: Readonly<PreconditionFailure>;
+}
+
+export type PreconditionResult =
+  | PreconditionSuccessResult
+  | PreconditionFailureResult;
+
 export interface ErrorReporter {
   reportError(error: SwagError): Promise<void>;
 }
@@ -232,6 +257,53 @@ export interface SubCommandUsage {
   channel?: TextChannel;
 }
 
+export type MessageCommandUsage = CommandUsage & {
+  interaction?: null;
+  message: Message;
+};
+
+export type ChatInputCommandUsage =
+  | (CommandUsage & {
+      interaction: CommandInteraction;
+      message?: null;
+    })
+  | (SubCommandUsage & {
+      interaction: CommandInteraction;
+    });
+
+export type PreconditionCommand = Command | SubcommandOption;
+
+export class Precondition {
+  public readonly instance: SWAG;
+  public readonly name: string;
+  public constructor(instance: SWAG, name: string);
+  public messageRun?(
+    usage: MessageCommandUsage,
+    command: Command,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
+  public chatInputRun?(
+    usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
+  public ok(): PreconditionResult;
+  public error(options: PreconditionFailureOptions): PreconditionResult;
+}
+
+export abstract class AllFlowsPrecondition extends Precondition {
+  public abstract messageRun(
+    usage: MessageCommandUsage,
+    command: Command,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
+  public abstract chatInputRun(
+    usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
+}
+
 export interface CommandObject {
   callback: (commandUsage: CommandUsage) => Awaitable<CommandResponse | void>;
   type: CommandType;
@@ -289,6 +361,12 @@ export interface SubcommandOptionObject {
   options?: ApplicationCommandOption[];
   autocomplete?: function;
   reply?: boolean;
+}
+
+export class SubcommandOption {
+  public get instance(): SWAG;
+  public get commandName(): string;
+  public get optionObject(): SubcommandOptionObject;
 }
 
 export { CommandObject, Command, CommandType };

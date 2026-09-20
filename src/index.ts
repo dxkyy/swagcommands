@@ -12,6 +12,10 @@ import { MessageResponseError } from "./errors/MessageResponseError";
 import { ModuleLoadError } from "./errors/ModuleLoadError";
 import { SwagError } from "./errors/SwagError";
 import ResponseHandler from "./execution/ResponseHandler";
+import {
+  AllFlowsPrecondition,
+  Precondition,
+} from "./preconditions/Precondition";
 
 module.exports = SWAG;
 module.exports.CommandType = CommandType;
@@ -28,3 +32,5 @@ module.exports.MessageResponseError = MessageResponseError;
 module.exports.ModuleLoadError = ModuleLoadError;
 module.exports.ResponseHandler = ResponseHandler;
 module.exports.SwagError = SwagError;
+module.exports.AllFlowsPrecondition = AllFlowsPrecondition;
+module.exports.Precondition = Precondition;
