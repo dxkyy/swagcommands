@@ -94,9 +94,10 @@ function normalizeFeature(
   if (
     typeof definition.everyMs !== "number" ||
     !Number.isFinite(definition.everyMs) ||
-    definition.everyMs <= 0
+    definition.everyMs <= 0 ||
+    definition.everyMs > 2_147_483_647
   ) {
-    invalid(`Feature "${name}" must set everyMs to a positive finite number.`, filePath, name);
+    invalid(`Feature "${name}" must set everyMs above 0 and at most 2,147,483,647 milliseconds.`, filePath, name);
   }
   if (
     definition.runOnStart !== undefined &&

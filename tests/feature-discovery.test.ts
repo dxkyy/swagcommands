@@ -82,8 +82,9 @@ describe("feature discovery", () => {
 
   it.each([
     [{ run: () => {}, phase: "early" }, "invalid phase"],
-    [{ run: () => {}, everyMs: 0 }, "positive finite number"],
-    [{ run: () => {}, everyMs: Infinity }, "positive finite number"],
+    [{ run: () => {}, everyMs: 0 }, "above 0 and at most 2,147,483,647"],
+    [{ run: () => {}, everyMs: Infinity }, "above 0 and at most 2,147,483,647"],
+    [{ run: () => {}, everyMs: 2_147_483_648 }, "above 0 and at most 2,147,483,647"],
     [{ run: () => {}, runOnStart: true }, "without everyMs"],
     [{ run: () => {}, everyMs: 1000, runOnStart: "yes" }, "boolean"],
     [{ run: () => {}, name: "  " }, "invalid name"],
