@@ -21,6 +21,7 @@ const client = new Client({
 const swag = await SWAG.create({
   client,
   commandsDir: "./commands",
+  contextMenusDir: "./context-menus",
   subcommandsDir: "./subcommands",
   featuresDir: "./features",
   botOwners: ["YOUR_DISCORD_USER_ID"],
@@ -29,7 +30,7 @@ const swag = await SWAG.create({
 await client.login(process.env.DISCORD_TOKEN);
 ```
 
-`SWAG.create()` resolves only after command, subcommand, feature, and event files have loaded, their asynchronous initialization hooks have completed, and event listeners have been registered. If any of that work fails, the promise rejects with an `InitializationError`; a partially initialized instance is not returned.
+`SWAG.create()` resolves only after command, subcommand, context-menu, feature, and event files have loaded, their asynchronous initialization hooks have completed, and event listeners have been registered. If any of that work fails, the promise rejects with an `InitializationError`; a partially initialized instance is not returned.
 
 The instance exposes `state` and `isReady()` for lifecycle inspection:
 
@@ -73,8 +74,8 @@ SWAGCommands forwards the returned value to Discord.js without reconstructing th
 
 | Invocation                         | Framework method                |
 | ---------------------------------- | ------------------------------- |
-| Fresh interaction                  | `interaction.reply(result)`     |
-| Deferred interaction               | `interaction.editReply(result)` |
+| Fresh application-command interaction | `interaction.reply(result)`     |
+| Deferred application-command interaction | `interaction.editReply(result)` |
 | Message command with `reply: true` | `message.reply(result)`         |
 | Other message commands             | `message.channel.send(result)`  |
 
@@ -104,6 +105,8 @@ deferReply: {
 ```
 
 For message commands, `deferReply` sends the channel typing indicator instead of deferring an interaction.
+
+Context-menu commands use the same interaction response behavior. Their typed callback usage additionally exposes `targetUser` and `targetMember` for user commands or `targetMessage` for message commands. See [V2 command definitions and routing](v2-command-support.md).
 
 ## Structured errors
 

@@ -1,10 +1,13 @@
 import {
+  ApplicationCommandData,
   ApplicationCommandOptionType,
+  ApplicationCommandType,
   ChatInputApplicationCommandData,
 } from "discord.js";
 import { describe, expect, it, vi } from "vitest";
 
 import Command from "../../src/command-handler/Command";
+import ContextMenuCommand from "../../src/context-menu-handler/ContextMenuCommand";
 import { buildCommandManifests } from "../../src/deployment/CommandManifestBuilder";
 import { PreconditionContainerArray } from "../../src/preconditions/containers/PreconditionContainerArray";
 import { PreconditionStore } from "../../src/preconditions/PreconditionStore";
@@ -13,6 +16,7 @@ import SubcommandOption from "../../src/subcommand-handler/SubcommandOption";
 import CommandType from "../../src/util/CommandType";
 import SWAG, {
   CommandObject,
+  ContextMenuCommandObject,
   SubcommandObject,
   SubcommandOptionObject,
 } from "../../typings";
@@ -60,12 +64,54 @@ const createSubcommand = (
     preconditions(),
   );
 
-const findCommand = (
-  commands: readonly ChatInputApplicationCommandData[],
+const createContextMenu = (
   name: string,
-) => commands.find((command) => command.name === name);
+  definition: ContextMenuCommandObject,
+) => new ContextMenuCommand(instance, name, definition, preconditions());
+
+const findCommand = (
+  commands: readonly ApplicationCommandData[],
+  name: string,
+): ChatInputApplicationCommandData | undefined =>
+  commands.find(
+    (command) =>
+      command.name === name &&
+      (command.type ?? ApplicationCommandType.ChatInput) ===
+        ApplicationCommandType.ChatInput,
+  ) as ChatInputApplicationCommandData | undefined;
 
 describe("application command manifest builder", () => {
+  it("builds user and message context-menu manifests", () => {
+    const user = createContextMenu("Inspect", {
+      callback: vi.fn(),
+      type: ApplicationCommandType.User,
+    });
+    const message = createContextMenu("Inspect", {
+      callback: vi.fn(),
+      type: ApplicationCommandType.Message,
+    });
+    const test = createContextMenu("Report Message", {
+      callback: vi.fn(),
+      testOnly: true,
+      type: ApplicationCommandType.Message,
+    });
+
+    expect(buildCommandManifests({
+      contextMenus: [message, user, test],
+    })).toEqual({
+      global: [
+        { name: "Inspect", type: ApplicationCommandType.User },
+        { name: "Inspect", type: ApplicationCommandType.Message },
+      ],
+      test: [
+        {
+          name: "Report Message",
+          type: ApplicationCommandType.Message,
+        },
+      ],
+    });
+  });
+
   it("includes slash-capable commands once and sorts them by name", () => {
     const alpha = createCommand("alpha", { type: CommandType.SLASH });
     const beta = createCommand("beta", { type: CommandType.BOTH });
@@ -131,13 +177,12 @@ describe("application command manifest builder", () => {
   it("builds subcommands and subcommand groups", () => {
     const command = createSubcommand(
       "admin",
-      { description: "Administration" },
+      { description: "Administration", type: CommandType.SLASH },
       [
         {
           fileName: "status",
           definition: {
             callback: vi.fn(),
-            name: "status",
             description: "Show status",
             options: [
               {
@@ -152,7 +197,6 @@ describe("application command manifest builder", () => {
           fileName: "moderation",
           definition: {
             callback: vi.fn(),
-            name: "moderation",
             description: "Moderation commands",
             options: [
               {
@@ -202,6 +246,24 @@ describe("application command manifest builder", () => {
     ]);
   });
 
+  it("does not deploy legacy-only subcommand roots", () => {
+    const legacy = createSubcommand(
+      "admin",
+      { type: CommandType.LEGACY },
+      [
+        {
+          fileName: "ban",
+          definition: { callback: vi.fn() },
+        },
+      ],
+    );
+
+    expect(buildCommandManifests({ subcommands: [legacy] })).toEqual({
+      global: [],
+      test: [],
+    });
+  });
+
   it("partitions test commands and rejects duplicate roots per scope", () => {
     const global = createCommand("ping", { type: CommandType.SLASH });
     const test = createCommand("preview", {
@@ -218,7 +280,7 @@ describe("application command manifest builder", () => {
 
     const duplicate = createSubcommand(
       "ping",
-      { description: "Duplicate" },
+      { description: "Duplicate", type: CommandType.SLASH },
       [],
     );
     expect(() =>
@@ -232,13 +294,12 @@ describe("application command manifest builder", () => {
   it("rejects malformed nested subcommand options", () => {
     const malformed = createSubcommand(
       "admin",
-      { description: "Administration" },
+      { description: "Administration", type: CommandType.SLASH },
       [
         {
           fileName: "mixed",
           definition: {
             callback: vi.fn(),
-            name: "mixed",
             description: "Mixed options",
             options: [
               {

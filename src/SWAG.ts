@@ -1,6 +1,7 @@
 import { Client, MessageFlags } from "discord.js";
 
 import CommandHandler from "./command-handler/CommandHandler";
+import MessageCommandRouter from "./command-handler/MessageCommandRouter";
 import EventHandler from "./event-handler/EventHandler";
 import SWAG, {
   CommandResponse,
@@ -32,15 +33,12 @@ import {
 } from "./deployment/CommandDeployer";
 import { CommandDeploymentError } from "./errors/CommandDeploymentError";
 import { CommandDefinitionError } from "./errors/CommandDefinitionError";
+import ContextMenuCommandHandler from "./context-menu-handler/ContextMenuCommandHandler";
 
 export const logger = new Logger();
 
 export type LifecycleState =
-  | "idle"
-  | "initializing"
-  | "ready"
-  | "failed"
-  | "destroyed";
+  "idle" | "initializing" | "ready" | "failed" | "destroyed";
 
 class SWAGCommands {
   private _client!: Client;
@@ -49,6 +47,7 @@ class SWAGCommands {
   private _botOwners!: string[];
   private _validations!: Validations;
   private _commandHandler: CommandHandler | undefined;
+  private _contextMenuCommandHandler: ContextMenuCommandHandler | undefined;
   private _subcommandHandler: SubcommandHandler | undefined;
   private _eventHandler!: EventHandler;
   private _isConnectedToDB = false;
@@ -62,6 +61,7 @@ class SWAGCommands {
   private readonly _options: Options;
   private readonly _commandExecutor: CommandExecutor;
   private readonly _responseHandler: ResponseHandler;
+  private _messageCommandRouter!: MessageCommandRouter;
 
   private constructor(options: Options) {
     this._options = {
@@ -74,10 +74,7 @@ class SWAGCommands {
     this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
     this._cooldownStore = options.cooldownStore ?? new MemoryCooldownStore();
     this._preconditions = new PreconditionStore();
-    registerBuiltInPreconditions(
-      this as unknown as SWAG,
-      this._preconditions,
-    );
+    registerBuiltInPreconditions(this as unknown as SWAG, this._preconditions);
     this._responseHandler = new ResponseHandler(this);
     this._commandExecutor = new CommandExecutor(this as unknown as SWAG);
   }
@@ -116,6 +113,7 @@ class SWAGCommands {
     let {
       client,
       commandsDir,
+      contextMenusDir,
       preconditionsDir,
       subcommandsDir,
       featuresDir,
@@ -167,6 +165,15 @@ class SWAGCommands {
       await this._commandHandler.load();
     }
 
+    if (contextMenusDir) {
+      this._contextMenuCommandHandler = new ContextMenuCommandHandler(
+        this as unknown as SWAG,
+        contextMenusDir,
+        this._commandExecutor,
+      );
+      await this._contextMenuCommandHandler.load();
+    }
+
     if (subcommandsDir) {
       this._subcommandHandler = new SubcommandHandler(
         this as unknown as SWAG,
@@ -185,6 +192,10 @@ class SWAGCommands {
       await featuresHandler.load();
     }
 
+    this._messageCommandRouter = new MessageCommandRouter(
+      this as unknown as SWAG,
+    );
+
     this._eventHandler = new EventHandler(
       this as unknown as SWAG,
       events as Events,
@@ -197,9 +208,11 @@ class SWAGCommands {
       client,
       () => {
         const commands = this._commandHandler?.commands;
+        const contextMenus = this._contextMenuCommandHandler?.commands;
         const subcommands = this._subcommandHandler?.commands;
         return {
           commands: commands?.values(),
+          contextMenus: contextMenus?.values(),
           subcommands: subcommands?.values(),
         };
       },
@@ -225,6 +238,10 @@ class SWAGCommands {
 
   public get commandHandler(): CommandHandler | undefined {
     return this._commandHandler;
+  }
+
+  public get contextMenuCommandHandler(): ContextMenuCommandHandler | undefined {
+    return this._contextMenuCommandHandler;
   }
 
   public get subcommandHandler(): SubcommandHandler | undefined {
@@ -265,6 +282,10 @@ class SWAGCommands {
 
   public get responseHandler(): ResponseHandler {
     return this._responseHandler;
+  }
+
+  public get messageCommandRouter(): MessageCommandRouter {
+    return this._messageCommandRouter;
   }
 
   public async deployCommands(

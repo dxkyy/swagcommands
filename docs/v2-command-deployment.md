@@ -2,6 +2,8 @@
 
 V2 separates local command loading from Discord application-command deployment. `SWAG.create()` reads and validates command definitions without contacting Discord's application-command API. After the Discord client is ready, call `deployCommands()` explicitly to synchronize the desired commands.
 
+See [V2 command definitions and routing](v2-command-support.md) for normal command, subcommand, and context-menu file formats.
+
 ## Deploy after the Discord client is ready
 
 ```ts
@@ -20,6 +22,7 @@ const client = new Client({
 const swag = await SWAG.create({
   client,
   commandsDir: "./commands",
+  contextMenusDir: "./context-menus",
   subcommandsDir: "./subcommands",
   testServers: ["TEST_GUILD_ID"],
   botOwners: ["YOUR_DISCORD_USER_ID"],
@@ -53,11 +56,13 @@ The available scopes are:
 
 | Scope | Commands synchronized | Discord target |
 | --- | --- | --- |
-| `"global"` | `SLASH` and `BOTH` commands without `testOnly`, plus non-test subcommand roots | Global application commands |
-| `"test"` | Commands and subcommand roots with `testOnly: true` | Every configured test guild |
+| `"global"` | Non-test `SLASH` and `BOTH` commands, subcommand roots, and context menus | Global application commands |
+| `"test"` | Chat-input commands, subcommand roots, and context menus with `testOnly: true` | Every configured test guild |
 | `"all"` | Both manifests | Global application commands followed by test guilds |
 
-Message-only commands are never included. Command aliases remain message-command aliases and do not become additional application commands.
+Message-only commands are never included. Command aliases remain message-command aliases and do not become additional application commands. User and message context menus are deployed with their `ApplicationCommandType`; they do not have descriptions or options.
+
+Discord identifies commands by both name and type. A chat-input command, user context menu, and message context menu may therefore share a name. Duplicate names within the same application-command type and deployment scope are rejected before synchronization begins.
 
 Synchronize only one kind of target when needed:
 
@@ -94,7 +99,7 @@ Global command changes may take longer to propagate through Discord than guild c
 
 ## Delete or rename a command
 
-To delete one command:
+To delete one command of any supported application-command type:
 
 1. Remove its local command file or subcommand root.
 2. Synchronize its current scope.
@@ -126,7 +131,7 @@ Clearing a guild is particularly important when removing it from `testServers`. 
 
 ## Move commands between scopes
 
-The root command's `testOnly` setting determines its deployment manifest:
+The command's `testOnly` setting determines its deployment manifest:
 
 ```ts
 export default {
@@ -145,17 +150,19 @@ await swag.deployCommands({ scope: "all" });
 
 This removes the command from its old scope and registers it in the new scope. Deploying only the new scope would leave the old registration in place.
 
-For subcommands, deployment scope is determined by `testOnly` on the root subcommand definition rather than individual leaf options.
+For subcommands, deployment scope is determined by `testOnly` on the root subcommand definition rather than individual leaf options. Each context-menu definition controls its own scope.
 
 ## Results and failures
 
-Successful deployments return the targets and command names that were synchronized:
+Successful deployments return the targets and typed command identities that were synchronized. The explicit type keeps same-name user and message commands distinguishable:
 
 ```ts
 const result = await swag.deployCommands();
 
 for (const target of result.targets) {
-  console.log(target.scope, target.guildId, target.commandNames);
+  for (const command of target.commands) {
+    console.log(target.scope, target.guildId, command.name, command.type);
+  }
 }
 ```
 
@@ -181,7 +188,7 @@ try {
 }
 ```
 
-Deployment errors reject the public method directly so deployment scripts and CI can fail visibly. They are not routed through the runtime `onError` callback. Invalid local manifests, such as duplicate root command names in one scope, reject with `CommandDefinitionError` before any Discord scope is modified.
+Deployment errors reject the public method directly so deployment scripts and CI can fail visibly. They are not routed through the runtime `onError` callback. Invalid local manifests, such as duplicate command identities in one scope, reject with `CommandDefinitionError` before any Discord scope is modified.
 
 ## V1 migration
 
@@ -196,7 +203,7 @@ Deployment errors reject the public method directly so deployment scripts and CI
 2. Do not expect constructors or command loading to create, edit, or delete Discord commands.
 3. Remove `delete: true` tombstone definitions. Delete the file and synchronize its scope instead.
 4. Use `clearCommands()` to clean a global scope or a test guild that is no longer configured.
-5. Review `testOnly` definitions. They deploy only to `testServers`; non-test definitions deploy globally.
+5. Review `testOnly` definitions across chat-input commands, subcommand roots, and context menus. They deploy only to `testServers`; non-test definitions deploy globally.
 6. Deploy `scope: "all"` after moving a command between global and test deployment.
 7. Ensure SWAGCommands is the only owner of synchronized command scopes, or include externally managed commands in the same desired manifest.
 8. Handle rejected deployment promises in startup scripts and CI.

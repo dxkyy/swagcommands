@@ -1,13 +1,22 @@
 import {
+  ApplicationCommandType,
   Client,
   CommandInteraction,
+  ContextMenuCommandInteraction,
   GuildMember,
   Message,
   TextChannel,
 } from "discord.js";
 
-import SWAG, { CommandUsage, SubCommandUsage } from "../../typings";
+import SWAG, {
+  CommandUsage,
+  ContextMenuCommandUsage,
+  MessageContextMenuCommandUsage,
+  SubcommandUsage,
+  UserContextMenuCommandUsage,
+} from "../../typings";
 import Command from "../command-handler/Command";
+import ContextMenuCommand from "../context-menu-handler/ContextMenuCommand";
 import CommandType from "../util/CommandType";
 import { CommandExecutionError } from "../errors/CommandExecutionError";
 import { PreconditionExecutionError } from "../errors/PreconditionExecutionError";
@@ -42,7 +51,10 @@ class CommandExecutor {
   ): Promise<void> {
     const { callback, deferReply, reply, type } = command.commandObject;
 
-    if (message && type === CommandType.SLASH) {
+    if (
+      (message && type === CommandType.SLASH) ||
+      (interaction && type === CommandType.LEGACY)
+    ) {
       return;
     }
 
@@ -133,44 +145,184 @@ class CommandExecutor {
   public async executeSubcommand(
     command: SubcommandOption,
     args: string[],
-    interaction: CommandInteraction,
+    message: Message | null,
+    interaction: CommandInteraction | null,
+    selection: {
+      subcommandGroup?: string;
+      subcommandName?: string;
+    } = {},
   ): Promise<void> {
-    const { callback, deferReply } = command.optionObject;
+    if ((!message && !interaction) || (message && interaction)) {
+      return;
+    }
+
+    const { callback } = command.optionObject;
+    const { type } = command.parent.commandObject;
+    if (
+      (message && type === CommandType.SLASH) ||
+      (interaction && type === CommandType.LEGACY)
+    ) {
+      return;
+    }
+
+    const deferReply =
+      command.optionObject.deferReply ??
+      command.parent.commandObject.deferReply ??
+      false;
+    const reply =
+      command.optionObject.reply ?? command.parent.commandObject.reply ?? false;
     const context = {
       commandName: command.parent.commandName,
-      invocationKind: "interaction" as const,
+      invocationKind: (message ? "message" : "interaction") as
+        | "message"
+        | "interaction",
       subcommandName: command.commandName,
     };
 
-    const usage = this.createSubcommandUsage(command, args, interaction);
+    const usage = this.createSubcommandUsage(
+      command,
+      args,
+      message,
+      interaction,
+      selection,
+    );
 
     try {
-      const rootResult = await command.parent.preconditions.chatInputCheck(
-        usage as ChatInputCommandUsage,
-        command.parent,
-      );
+      const rootResult = message
+        ? await command.parent.preconditions.messageCheck(
+            usage as MessageCommandUsage,
+            command.parent,
+          )
+        : await command.parent.preconditions.chatInputCheck(
+            usage as ChatInputCommandUsage,
+            command.parent,
+          );
       if (
         !(await this.handlePreconditionResult(
           rootResult,
-          usage as ChatInputCommandUsage,
+          usage,
           command.parent,
-          null,
+          message,
           interaction,
-          false,
+          reply,
           context,
         ))
       ) {
         return;
       }
 
-      const optionResult = await command.preconditions.chatInputCheck(
-        usage as ChatInputCommandUsage,
+      const optionResult = message
+        ? await command.preconditions.messageCheck(
+            usage as MessageCommandUsage,
+            command,
+          )
+        : await command.preconditions.chatInputCheck(
+            usage as ChatInputCommandUsage,
+            command,
+          );
+      if (
+        !(await this.handlePreconditionResult(
+          optionResult,
+          usage,
+          command,
+          message,
+          interaction,
+          reply,
+          context,
+        ))
+      ) {
+        return;
+      }
+
+      if (
+        !(await this.runPreconditionCommits(
+          rootResult,
+          usage,
+          command.parent,
+          message,
+          interaction,
+          reply,
+          context,
+        )) ||
+        !(await this.runPreconditionCommits(
+          optionResult,
+          usage,
+          command,
+          message,
+          interaction,
+          reply,
+          context,
+        ))
+      ) {
+        return;
+      }
+
+      if (interaction && deferReply) {
+        const deferred = await this._instance.responseHandler.defer(
+          interaction,
+          deferReply,
+          context,
+        );
+        if (!deferred) {
+          return;
+        }
+      } else if (message && deferReply) {
+        await this._instance.responseHandler.indicateTyping(message, context);
+      }
+
+      const response = await callback(usage);
+      if (response === undefined) {
+        return;
+      }
+
+      if (interaction) {
+        await this._instance.responseHandler.respondToInteraction(
+          interaction,
+          response as InteractionResponse,
+          context,
+        );
+      } else if (message) {
+        await this._instance.responseHandler.respondToMessage(
+          message,
+          response as MessageResponse,
+          reply,
+          context,
+        );
+      }
+    } catch (error) {
+      await this.reportExecutionError(error, context);
+    }
+  }
+
+  public async executeContextMenuCommand(
+    command: ContextMenuCommand,
+    interaction: ContextMenuCommandInteraction,
+  ): Promise<void> {
+    const { callback, deferReply, type } = command.commandObject;
+    if (
+      (type === ApplicationCommandType.User &&
+        !interaction.isUserContextMenuCommand()) ||
+      (type === ApplicationCommandType.Message &&
+        !interaction.isMessageContextMenuCommand())
+    ) {
+      return;
+    }
+
+    const context = {
+      commandName: command.commandName,
+      invocationKind: "interaction" as const,
+    };
+    const usage = this.createContextMenuCommandUsage(command, interaction);
+
+    try {
+      const preconditionResult = await command.preconditions.contextMenuCheck(
+        usage,
         command,
       );
       if (
         !(await this.handlePreconditionResult(
-          optionResult,
-          usage as ChatInputCommandUsage,
+          preconditionResult,
+          usage,
           command,
           null,
           interaction,
@@ -180,20 +332,10 @@ class CommandExecutor {
       ) {
         return;
       }
-
       if (
         !(await this.runPreconditionCommits(
-          rootResult,
-          usage as ChatInputCommandUsage,
-          command.parent,
-          null,
-          interaction,
-          false,
-          context,
-        )) ||
-        !(await this.runPreconditionCommits(
-          optionResult,
-          usage as ChatInputCommandUsage,
+          preconditionResult,
+          usage,
           command,
           null,
           interaction,
@@ -215,16 +357,16 @@ class CommandExecutor {
         }
       }
 
-      const response = await callback(usage);
-      if (response === undefined) {
-        return;
+      const response = type === ApplicationCommandType.User
+        ? await callback(usage as UserContextMenuCommandUsage)
+        : await callback(usage as MessageContextMenuCommandUsage);
+      if (response !== undefined) {
+        await this._instance.responseHandler.respondToInteraction(
+          interaction,
+          response,
+          context,
+        );
       }
-
-      await this._instance.responseHandler.respondToInteraction(
-        interaction,
-        response as InteractionResponse,
-        context,
-      );
     } catch (error) {
       await this.reportExecutionError(error, context);
     }
@@ -232,7 +374,10 @@ class CommandExecutor {
 
   private async handlePreconditionResult(
     result: PreconditionResult,
-    usage: MessageCommandUsage | ChatInputCommandUsage,
+    usage:
+      | MessageCommandUsage
+      | ChatInputCommandUsage
+      | ContextMenuCommandUsage,
     command: PreconditionCommand,
     message: Message | null,
     interaction: CommandInteraction | null,
@@ -276,7 +421,10 @@ class CommandExecutor {
 
   private async runPreconditionCommits(
     check: PreconditionCheckResult,
-    usage: MessageCommandUsage | ChatInputCommandUsage,
+    usage:
+      | MessageCommandUsage
+      | ChatInputCommandUsage
+      | ContextMenuCommandUsage,
     command: PreconditionCommand,
     message: Message | null,
     interaction: CommandInteraction | null,
@@ -352,21 +500,85 @@ class CommandExecutor {
     };
   }
 
+  private createContextMenuCommandUsage(
+    command: ContextMenuCommand,
+    interaction: ContextMenuCommandInteraction,
+  ): ContextMenuCommandUsage {
+    const base = {
+      args: [],
+      channel: interaction.channel as TextChannel,
+      client: command.instance.client as Client,
+      guild: interaction.guild,
+      instance: command.instance,
+      member: interaction.member as GuildMember,
+      message: null as null,
+      text: "",
+      user: interaction.user,
+    };
+
+    if (interaction.isUserContextMenuCommand()) {
+      return {
+        ...base,
+        interaction,
+        targetMember: interaction.targetMember,
+        targetUser: interaction.targetUser,
+      };
+    }
+
+    if (interaction.isMessageContextMenuCommand()) {
+      return {
+        ...base,
+        interaction,
+        targetMessage: interaction.targetMessage,
+      };
+    }
+
+    throw new TypeError("Expected a user or message context-menu interaction.");
+  }
+
   private createSubcommandUsage(
     command: SubcommandOption,
     args: string[],
-    interaction: CommandInteraction,
-  ): SubCommandUsage {
+    message: Message | null,
+    interaction: CommandInteraction | null,
+    selection: {
+      subcommandGroup?: string;
+      subcommandName?: string;
+    },
+  ): SubcommandUsage {
+    const identity = {
+      commandName: command.parent.commandName,
+      subcommandGroup: selection.subcommandGroup,
+      subcommandName: selection.subcommandName ?? command.commandName,
+    };
+    if (message) {
+      return {
+        args,
+        channel: message.channel as TextChannel,
+        client: command.instance.client as Client,
+        guild: message.guild,
+        instance: command.instance,
+        interaction: null,
+        member: message.member as GuildMember,
+        message,
+        ...identity,
+        text: args.join(" "),
+        user: message.author,
+      };
+    }
+
     return {
       args,
-      channel: interaction.channel as TextChannel,
-      client: command.instance.client,
-      guild: interaction.guild,
+      channel: interaction!.channel as TextChannel,
+      client: command.instance.client as Client,
+      guild: interaction!.guild,
       instance: command.instance,
-      interaction,
-      member: interaction.member as GuildMember,
+      interaction: interaction!,
+      member: interaction!.member as GuildMember,
+      message: null,
+      ...identity,
       text: args.join(" "),
-      user: interaction.user,
+      user: interaction!.user,
     };
   }
 }

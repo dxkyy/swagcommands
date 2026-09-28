@@ -8,6 +8,7 @@ import { PreconditionStore } from "../../src/preconditions/PreconditionStore";
 import { PreconditionContainerArray } from "../../src/preconditions/containers/PreconditionContainerArray";
 import Subcommand from "../../src/subcommand-handler/Subcommand";
 import SubcommandOption from "../../src/subcommand-handler/SubcommandOption";
+import CommandType from "../../src/util/CommandType";
 
 const createInteraction = () => ({
   channel: {},
@@ -20,6 +21,18 @@ const createInteraction = () => ({
   replied: false,
   reply: vi.fn().mockResolvedValue(undefined),
   user: { id: "user-id" },
+});
+
+const createMessage = () => ({
+  author: { id: "user-id" },
+  channel: {
+    isSendable: vi.fn(() => true),
+    send: vi.fn().mockResolvedValue(undefined),
+    sendTyping: vi.fn().mockResolvedValue(undefined),
+  },
+  guild: { id: "guild-id" },
+  member: {},
+  reply: vi.fn().mockResolvedValue(undefined),
 });
 
 const createExecutor = () => {
@@ -55,6 +68,22 @@ const createContainer = (
   return new PreconditionContainerArray(store, [name]);
 };
 
+const createMessageContainer = (
+  instance: any,
+  name: string,
+  run: (...args: any[]) => any,
+  commit?: (...args: any[]) => any,
+) => {
+  class TestPrecondition extends Precondition {
+    public override messageRun = run;
+    public override messageCommit = commit;
+  }
+
+  const store = new PreconditionStore();
+  store.register(new TestPrecondition(instance, name));
+  return new PreconditionContainerArray(store, [name]);
+};
+
 const emptyContainer = () =>
   new PreconditionContainerArray(new PreconditionStore());
 
@@ -68,13 +97,13 @@ const createSubcommand = (
   const option = new SubcommandOption(
     instance,
     "ban",
-    { callback, deferReply, name: "ban" },
+    { callback, deferReply },
     optionPreconditions,
   );
   new Subcommand(
     instance,
     "admin",
-    { description: "Administration" },
+    { description: "Administration", type: CommandType.SLASH },
     [option],
     rootPreconditions,
   );
@@ -101,7 +130,12 @@ describe("central command execution", () => {
     });
     const command = createSubcommand(instance, callback, root, option);
 
-    await executor.executeSubcommand(command, ["user-id"], interaction as never);
+    await executor.executeSubcommand(
+      command,
+      ["user-id"],
+      null,
+      interaction as never,
+    );
 
     expect(order).toEqual(["root", "option", "callback"]);
     expect(interaction.reply).toHaveBeenCalledWith(response);
@@ -119,7 +153,7 @@ describe("central command execution", () => {
     const option = createContainer(instance, "Option", optionRun);
     const command = createSubcommand(instance, callback, root, option, true);
 
-    await executor.executeSubcommand(command, [], interaction as never);
+    await executor.executeSubcommand(command, [], null, interaction as never);
 
     expect(optionRun).not.toHaveBeenCalled();
     expect(interaction.deferReply).not.toHaveBeenCalled();
@@ -141,7 +175,7 @@ describe("central command execution", () => {
     }));
     const command = createSubcommand(instance, vi.fn(), emptyContainer(), option);
 
-    await executor.executeSubcommand(command, [], interaction as never);
+    await executor.executeSubcommand(command, [], null, interaction as never);
 
     expect(handlePreconditionFailure).toHaveBeenCalledWith(
       expect.objectContaining({ command, failure }),
@@ -157,7 +191,7 @@ describe("central command execution", () => {
     });
     const command = createSubcommand(instance, vi.fn(), emptyContainer(), option);
 
-    await executor.executeSubcommand(command, [], interaction as never);
+    await executor.executeSubcommand(command, [], null, interaction as never);
 
     expect(reportError).toHaveBeenCalledOnce();
     expect(reportError.mock.calls[0][0]).toBeInstanceOf(PreconditionExecutionError);
@@ -193,10 +227,258 @@ describe("central command execution", () => {
     await executor.executeSubcommand(
       command,
       [],
+      null,
       createInteraction() as never,
     );
 
     expect(commit).not.toHaveBeenCalled();
     expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("executes message subcommands with leaf response settings", async () => {
+    const response = { content: "Banned" };
+    const callback = vi.fn().mockResolvedValue(response);
+    const message = createMessage();
+    const { executor, instance } = createExecutor();
+    const option = new SubcommandOption(
+      instance,
+      "ban",
+      {
+        callback,
+        deferReply: true,
+        reply: false,
+      },
+      emptyContainer(),
+    );
+    new Subcommand(
+      instance,
+      "admin",
+      {
+        deferReply: false,
+        reply: true,
+        type: CommandType.BOTH,
+      },
+      [option],
+      emptyContainer(),
+    );
+
+    await executor.executeSubcommand(
+      option,
+      ["user-id", "spam"],
+      message as never,
+      null,
+    );
+
+    expect(callback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        args: ["user-id", "spam"],
+        interaction: null,
+        message,
+        text: "user-id spam",
+        user: message.author,
+      }),
+    );
+    expect(message.channel.sendTyping).toHaveBeenCalledOnce();
+    expect(message.channel.send).toHaveBeenCalledWith(response);
+    expect(message.reply).not.toHaveBeenCalled();
+  });
+
+  it("inherits message response settings from the subcommand root", async () => {
+    const callback = vi.fn().mockResolvedValue("Done");
+    const message = createMessage();
+    const { executor, instance } = createExecutor();
+    const option = new SubcommandOption(
+      instance,
+      "ban",
+      { callback },
+      emptyContainer(),
+    );
+    new Subcommand(
+      instance,
+      "admin",
+      {
+        deferReply: true,
+        reply: true,
+        type: CommandType.LEGACY,
+      },
+      [option],
+      emptyContainer(),
+    );
+
+    await executor.executeSubcommand(option, [], message as never, null);
+
+    expect(message.channel.sendTyping).toHaveBeenCalledOnce();
+    expect(message.reply).toHaveBeenCalledWith("Done");
+    expect(message.channel.send).not.toHaveBeenCalled();
+  });
+
+  it("runs message root and leaf preconditions before their commits and callback", async () => {
+    const order: string[] = [];
+    const rootRun = vi.fn((_usage: any, _command: any) => {
+      order.push("root-check");
+      return { success: true as const };
+    });
+    const rootCommit = vi.fn(() => {
+      order.push("root-commit");
+      return { success: true as const };
+    });
+    const leafRun = vi.fn((_usage: any, _command: any) => {
+      order.push("leaf-check");
+      return { success: true as const };
+    });
+    const leafCommit = vi.fn(() => {
+      order.push("leaf-commit");
+      return { success: true as const };
+    });
+    const callback = vi.fn(() => {
+      order.push("callback");
+    });
+    const message = createMessage();
+    const { executor, instance } = createExecutor();
+    const rootPreconditions = createMessageContainer(
+      instance,
+      "Root",
+      rootRun,
+      rootCommit,
+    );
+    const leafPreconditions = createMessageContainer(
+      instance,
+      "Leaf",
+      leafRun,
+      leafCommit,
+    );
+    const option = new SubcommandOption(
+      instance,
+      "ban",
+      { callback },
+      leafPreconditions,
+    );
+    const root = new Subcommand(
+      instance,
+      "admin",
+      { type: CommandType.BOTH },
+      [option],
+      rootPreconditions,
+    );
+
+    await executor.executeSubcommand(option, ["user-id"], message as never, null);
+
+    expect(order).toEqual([
+      "root-check",
+      "leaf-check",
+      "root-commit",
+      "leaf-commit",
+      "callback",
+    ]);
+    expect(rootRun.mock.calls[0][1]).toBe(root);
+    expect(leafRun.mock.calls[0][1]).toBe(option);
+    expect(rootRun.mock.calls[0][0]).toMatchObject({ message });
+    expect(leafRun.mock.calls[0][0]).toMatchObject({ message });
+  });
+
+  it("does not commit a message root precondition when the leaf denies", async () => {
+    const rootCommit = vi.fn(() => ({ success: true as const }));
+    const callback = vi.fn();
+    const message = createMessage();
+    const { executor, instance } = createExecutor();
+    const rootPreconditions = createMessageContainer(
+      instance,
+      "Root",
+      () => ({ success: true as const }),
+      rootCommit,
+    );
+    const leafPreconditions = createMessageContainer(instance, "Leaf", () => ({
+      failure: { identifier: "DENIED", preconditionName: "Leaf" },
+      success: false as const,
+    }));
+    const option = new SubcommandOption(
+      instance,
+      "ban",
+      { callback },
+      leafPreconditions,
+    );
+    new Subcommand(
+      instance,
+      "admin",
+      { type: CommandType.LEGACY },
+      [option],
+      rootPreconditions,
+    );
+
+    await executor.executeSubcommand(option, [], message as never, null);
+
+    expect(rootCommit).not.toHaveBeenCalled();
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("reports message leaf precondition errors with the full identity", async () => {
+    const message = createMessage();
+    const { executor, instance, reportError } = createExecutor();
+    const leafPreconditions = createMessageContainer(instance, "Access", () => {
+      throw new Error("database unavailable");
+    });
+    const option = new SubcommandOption(
+      instance,
+      "ban",
+      { callback: vi.fn() },
+      leafPreconditions,
+    );
+    new Subcommand(
+      instance,
+      "admin",
+      { type: CommandType.LEGACY },
+      [option],
+      emptyContainer(),
+    );
+
+    await executor.executeSubcommand(option, [], message as never, null);
+
+    expect(reportError).toHaveBeenCalledOnce();
+    expect(reportError.mock.calls[0][0]).toBeInstanceOf(PreconditionExecutionError);
+    expect(reportError.mock.calls[0][0]).toMatchObject({
+      context: {
+        commandName: "admin",
+        invocationKind: "message",
+        preconditionName: "Access",
+        subcommandName: "ban",
+      },
+    });
+  });
+
+  it("ignores subcommand invocations outside the root command type", async () => {
+    const { executor, instance } = createExecutor();
+    const slashCallback = vi.fn();
+    const slash = createSubcommand(instance, slashCallback);
+
+    await executor.executeSubcommand(
+      slash,
+      [],
+      createMessage() as never,
+      null,
+    );
+
+    const legacyCallback = vi.fn();
+    const legacy = new SubcommandOption(
+      instance,
+      "ban",
+      { callback: legacyCallback },
+      emptyContainer(),
+    );
+    new Subcommand(
+      instance,
+      "admin",
+      { type: CommandType.LEGACY },
+      [legacy],
+      emptyContainer(),
+    );
+    await executor.executeSubcommand(
+      legacy,
+      [],
+      null,
+      createInteraction() as never,
+    );
+
+    expect(slashCallback).not.toHaveBeenCalled();
+    expect(legacyCallback).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MessageResponseError } from "../../src/errors/MessageResponseError";
 import Command from "../../src/command-handler/Command";
+import MessageCommandRouter from "../../src/command-handler/MessageCommandRouter";
 import CommandExecutor from "../../src/execution/CommandExecutor";
 import ResponseHandler from "../../src/execution/ResponseHandler";
 import handleLegacyCommand from "../../src/event-handler/events/messageCreate/isHuman/legacy-commands";
@@ -32,6 +33,11 @@ const createInstance = (response: unknown, reply = false) => {
   const responseHandler = new ResponseHandler({ reportError });
   const instance: any = {
     client: {},
+    defaultPrefix: "!",
+    prefixStore: {
+      getPrefix: vi.fn(),
+      setPrefix: vi.fn(),
+    },
     reportError,
     responseHandler,
   };
@@ -47,18 +53,15 @@ const createInstance = (response: unknown, reply = false) => {
     new PreconditionContainerArray(new PreconditionStore()),
   );
   const executor = new CommandExecutor(instance);
-  const prefixes = {
-    get: vi.fn().mockResolvedValue("!"),
-  };
   const runCommand = vi.fn(
     (executedCommand, args, message, interaction) =>
       executor.executeCommand(executedCommand, args, message, interaction),
   );
   instance.commandHandler = {
     commands: new Map([["hello", command]]),
-    prefixHandler: prefixes,
     runCommand,
   };
+  instance.messageCommandRouter = new MessageCommandRouter(instance);
 
   return {
     callback,

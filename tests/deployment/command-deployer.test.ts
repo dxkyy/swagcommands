@@ -1,4 +1,4 @@
-import { Client } from "discord.js";
+import { ApplicationCommandType, Client } from "discord.js";
 import { describe, expect, it, vi } from "vitest";
 
 import Command from "../../src/command-handler/Command";
@@ -70,16 +70,25 @@ describe("command deployment synchronization", () => {
     expect(set.mock.calls[2]?.[1]).toBe("guild-b");
     expect(result).toEqual({
       targets: [
-        { scope: "global", commandNames: ["ping"] },
+        {
+          scope: "global",
+          commands: [
+            { name: "ping", type: ApplicationCommandType.ChatInput },
+          ],
+        },
         {
           scope: "guild",
           guildId: "guild-a",
-          commandNames: ["preview"],
+          commands: [
+            { name: "preview", type: ApplicationCommandType.ChatInput },
+          ],
         },
         {
           scope: "guild",
           guildId: "guild-b",
-          commandNames: ["preview"],
+          commands: [
+            { name: "preview", type: ApplicationCommandType.ChatInput },
+          ],
         },
       ],
     });
@@ -173,11 +182,18 @@ describe("command deployment synchronization", () => {
       cause: failure,
       target: { scope: "guild", guildId: "guild-b" },
       completedTargets: [
-        { scope: "global", commandNames: ["ping"] },
+        {
+          scope: "global",
+          commands: [
+            { name: "ping", type: ApplicationCommandType.ChatInput },
+          ],
+        },
         {
           scope: "guild",
           guildId: "guild-a",
-          commandNames: ["preview"],
+          commands: [
+            { name: "preview", type: ApplicationCommandType.ChatInput },
+          ],
         },
       ],
     });
@@ -217,7 +233,10 @@ describe("command deployment synchronization", () => {
       subcommands: [
         {
           commandName: "duplicate",
-          commandObject: { description: "Duplicate" },
+          commandObject: {
+            description: "Duplicate",
+            type: CommandType.SLASH,
+          },
           options: [],
         },
       ] as never,
