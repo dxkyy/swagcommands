@@ -137,7 +137,6 @@ describe("application command manifest builder", () => {
           fileName: "status",
           definition: {
             callback: vi.fn(),
-            name: "status",
             description: "Show status",
             options: [
               {
@@ -152,7 +151,6 @@ describe("application command manifest builder", () => {
           fileName: "moderation",
           definition: {
             callback: vi.fn(),
-            name: "moderation",
             description: "Moderation commands",
             options: [
               {
@@ -238,7 +236,6 @@ describe("application command manifest builder", () => {
           fileName: "mixed",
           definition: {
             callback: vi.fn(),
-            name: "mixed",
             description: "Mixed options",
             options: [
               {

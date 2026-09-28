@@ -133,7 +133,7 @@ function buildSubcommandOption(
   option: SubcommandOption,
 ): ApplicationCommandOptionData {
   const { optionObject } = option;
-  const name = optionObject.name || option.commandName;
+  const name = option.commandName;
   const description = requireDescription(
     `${rootName}/${name}`,
     optionObject.description,

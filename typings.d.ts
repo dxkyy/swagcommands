@@ -727,7 +727,6 @@ export interface SubcommandOptionObject
     MessageCommandCapabilities,
     InteractionCommandCapabilities {
   callback: (commandUsage: SubcommandUsage) => Awaitable<CommandResponse | void>;
-  name?: string;
   options?: ApplicationCommandOptionData[];
   autocomplete?: function;
 }

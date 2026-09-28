@@ -19,6 +19,7 @@ interface ResolveCommandPreconditionsOptions {
   commandName: string;
   commandType: CommandType;
   filePath?: string;
+  subcommandName?: string;
 }
 
 interface ResolveChatInputPreconditionsOptions {

@@ -92,7 +92,10 @@ describe("end-to-end command synchronization", () => {
     ]);
     loading.files.set("/subcommands/admin", [
       {
-        fileContents: { description: "Administration" },
+        fileContents: {
+          description: "Administration",
+          type: CommandType.SLASH,
+        },
         filePath: "/subcommands/admin/index.ts",
       },
       {
@@ -116,6 +119,7 @@ describe("end-to-end command synchronization", () => {
         fileContents: {
           description: "Experimental commands",
           testOnly: true,
+          type: CommandType.SLASH,
         },
         filePath: "/subcommands/sandbox/index.ts",
       },

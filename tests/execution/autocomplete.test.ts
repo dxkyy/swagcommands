@@ -90,7 +90,6 @@ describe("autocomplete execution", () => {
       {
         autocomplete,
         callback: vi.fn(),
-        name: "user",
       },
       createPreconditions(),
     );

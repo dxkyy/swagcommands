@@ -69,7 +69,7 @@ const createSubcommand = (
   const option = new SubcommandOption(
     instance,
     "ban",
-    { callback, deferReply, name: "ban" },
+    { callback, deferReply },
     optionPreconditions,
   );
   new Subcommand(
