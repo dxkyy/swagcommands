@@ -1,6 +1,6 @@
 import {
   Client,
-  CommandInteraction,
+  ChatInputCommandInteraction,
   Message,
 } from "discord.js";
 import path from "path";
@@ -59,7 +59,7 @@ class CommandHandler {
 
     for (let fileData of [...files]) {
       const { filePath } = fileData;
-      const commandObject: CommandObject = fileData.fileContents;
+      const commandObject = fileData.fileContents as CommandObject;
 
       const split = filePath.split(/[\/\\]/);
       let commandName = split.pop()!;
@@ -101,17 +101,22 @@ class CommandHandler {
     command: Command,
     args: string[],
     message: Message | null,
-    interaction: CommandInteraction | null,
+    interaction: ChatInputCommandInteraction | null,
   ): Promise<void> {
     await this._executor.executeCommand(command, args, message, interaction);
   }
 
-  private getValidations(folder?: string) {
+  private getValidations(folder?: string): Array<(command: Command) => void> {
     if (!folder) {
       return [];
     }
 
-    return getAllFiles(folder).map((fileData) => fileData.fileContents);
+    return getAllFiles(folder).map(({ fileContents, filePath }) => {
+      if (typeof fileContents !== "function") {
+        throw new TypeError(`Validation file "${filePath}" must export a function.`);
+      }
+      return fileContents as (command: Command) => void;
+    });
   }
 }
 

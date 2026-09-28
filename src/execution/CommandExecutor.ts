@@ -1,6 +1,7 @@
 import {
   ApplicationCommandType,
   Client,
+  ChatInputCommandInteraction,
   CommandInteraction,
   ContextMenuCommandInteraction,
   GuildMember,
@@ -48,9 +49,10 @@ class CommandExecutor {
     command: Command,
     args: string[],
     message: Message | null,
-    interaction: CommandInteraction | null,
+    interaction: ChatInputCommandInteraction | null,
   ): Promise<void> {
-    const { callback, deferReply, reply, type } = command.commandObject;
+    const definition = command.commandObject;
+    const { deferReply, reply, type } = definition;
 
     if (
       (message && type === CommandType.SLASH) ||
@@ -119,7 +121,13 @@ class CommandExecutor {
         await this._instance.responseHandler.indicateTyping(message, context);
       }
 
-      const response = await callback(usage);
+      const response = type === CommandType.LEGACY
+        ? await definition.callback(usage as MessageCommandUsage)
+        : type === CommandType.SLASH
+          ? await definition.callback(usage as ChatInputCommandUsage)
+          : await definition.callback(
+              usage as MessageCommandUsage | ChatInputCommandUsage,
+            );
       if (response === undefined) {
         return;
       }
@@ -147,7 +155,7 @@ class CommandExecutor {
     command: SubcommandOption,
     args: string[],
     message: Message | null,
-    interaction: CommandInteraction | null,
+    interaction: ChatInputCommandInteraction | null,
     selection: {
       subcommandGroup?: string;
       subcommandName?: string;
@@ -476,7 +484,7 @@ class CommandExecutor {
     command: Command,
     args: string[],
     message: Message | null,
-    interaction: CommandInteraction | null,
+    interaction: ChatInputCommandInteraction | null,
   ): CommandUsage {
     const guild = message ? message.guild : interaction?.guild;
     const member = (
@@ -541,7 +549,7 @@ class CommandExecutor {
     command: SubcommandOption,
     args: string[],
     message: Message | null,
-    interaction: CommandInteraction | null,
+    interaction: ChatInputCommandInteraction | null,
     selection: {
       subcommandGroup?: string;
       subcommandName?: string;

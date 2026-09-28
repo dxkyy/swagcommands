@@ -1,7 +1,6 @@
 import {
   ApplicationCommandOptionType,
   ChatInputCommandInteraction,
-  CommandInteraction,
   Message,
 } from "discord.js";
 import path from "path";
@@ -403,7 +402,7 @@ class SubcommandHandler {
     command: SubcommandOption,
     args: string[],
     message: Message | null,
-    interaction: CommandInteraction | null,
+    interaction: ChatInputCommandInteraction | null,
     selection: {
       subcommandGroup?: string;
       subcommandName?: string;
@@ -418,12 +417,17 @@ class SubcommandHandler {
     );
   }
 
-  private getValidations(folder?: string) {
+  private getValidations(folder?: string): Array<(command: Subcommand | SubcommandOption) => void> {
     if (!folder) {
       return [];
     }
 
-    return getAllFiles(folder).map((fileData) => fileData.fileContents);
+    return getAllFiles(folder).map(({ fileContents, filePath }) => {
+      if (typeof fileContents !== "function") {
+        throw new TypeError(`Validation file "${filePath}" must export a function.`);
+      }
+      return fileContents as (command: Subcommand | SubcommandOption) => void;
+    });
   }
 
   private definitionError(

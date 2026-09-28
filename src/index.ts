@@ -114,6 +114,8 @@ export type {
 } from "./preconditions/built-ins/BuiltInPreconditions";
 
 export type {
+  AutocompleteCallback,
+  BothCommandObject,
   ChatInputCommandUsage,
   ChatInputSubcommandUsage,
   CommandDefinitionBase,
@@ -127,6 +129,7 @@ export type {
   FileData,
   InlinePrecondition,
   InteractionCommandCapabilities,
+  LegacyCommandObject,
   MessageCommandCapabilities,
   MessageCommandUsage,
   MessageContextMenuCommandObject,
@@ -143,6 +146,7 @@ export type {
   PreconditionSingleResolvable,
   PreconditionSingleResolvableDetails,
   SimplePreconditionKeys,
+  SlashCommandObject,
   SubcommandObject,
   SubcommandOptionObject,
   SubcommandUsage,

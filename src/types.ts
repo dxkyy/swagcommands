@@ -1,8 +1,9 @@
 import type {
   ApplicationCommandOptionData,
   ApplicationCommandType,
+  AutocompleteInteraction,
   Client,
-  CommandInteraction,
+  ChatInputCommandInteraction,
   Guild,
   GuildMember,
   Message,
@@ -13,11 +14,18 @@ import type {
 } from "discord.js";
 
 import type SWAGCommands from "./SWAG";
+import type Command from "./command-handler/Command";
+import type Subcommand from "./subcommand-handler/Subcommand";
 import type CommandType from "./util/CommandType";
 import type { SwagError, ErrorContext } from "./errors/SwagError";
 import type { PrefixStore } from "./prefixes/PrefixStore";
 import type { CooldownStore } from "./cooldowns/CooldownStore";
-import type { CommandResponse, DeferSetting, InteractionResponse } from "./execution/ResponseHandler";
+import type {
+  CommandResponse,
+  DeferSetting,
+  InteractionResponse,
+  MessageResponse,
+} from "./execution/ResponseHandler";
 import type { PreconditionContext, PreconditionCommand } from "./preconditions/Precondition";
 import type { PreconditionResult, PreconditionFailure } from "./preconditions/PreconditionResult";
 import type { Preconditions } from "./index";
@@ -56,8 +64,8 @@ export interface Options {
 }
 
 export interface Events {
-  dir: string;
-  [key: string]: any;
+  dir?: string;
+  [key: string]: unknown;
 }
 
 export interface Validations {
@@ -68,7 +76,7 @@ export interface CommandUsage {
   client: Client;
   instance: SWAGCommands;
   message?: Message | null;
-  interaction?: CommandInteraction | null;
+  interaction?: ChatInputCommandInteraction | null;
   args: string[];
   text: string;
   guild?: Guild | null;
@@ -97,7 +105,7 @@ export type MessageSubcommandUsage = SubcommandUsageBase & {
 };
 
 export type ChatInputSubcommandUsage = SubcommandUsageBase & {
-  interaction: CommandInteraction;
+  interaction: ChatInputCommandInteraction;
   message?: null;
 };
 
@@ -114,7 +122,7 @@ export type MessageCommandUsage =
 
 export type ChatInputCommandUsage =
   | (CommandUsage & {
-      interaction: CommandInteraction;
+      interaction: ChatInputCommandInteraction;
       message?: null;
     })
   | ChatInputSubcommandUsage;
@@ -251,19 +259,45 @@ export type ContextMenuCommandObject =
   | UserContextMenuCommandObject
   | MessageContextMenuCommandObject;
 
-export interface CommandObject
+export type AutocompleteCallback<TCommand extends Command | Subcommand> = (
+  command: TCommand,
+  focusedOption: string,
+  interaction: AutocompleteInteraction,
+) => Awaitable<readonly string[]>;
+
+interface CommandObjectBase
   extends CommandDefinitionBase,
     MessageCommandCapabilities,
     InteractionCommandCapabilities {
-  callback: (commandUsage: CommandUsage) => Awaitable<CommandResponse | void>;
-  type: CommandType;
   options?: ApplicationCommandOptionData[];
-  autocomplete?: Function;
+  autocomplete?: AutocompleteCallback<Command>;
 }
+
+export interface LegacyCommandObject extends CommandObjectBase {
+  type: CommandType.LEGACY;
+  callback: (usage: MessageCommandUsage) => Awaitable<MessageResponse | void>;
+}
+
+export interface SlashCommandObject extends CommandObjectBase {
+  type: CommandType.SLASH;
+  callback: (usage: ChatInputCommandUsage) => Awaitable<InteractionResponse | void>;
+}
+
+export interface BothCommandObject extends CommandObjectBase {
+  type: CommandType.BOTH;
+  callback: (
+    usage: MessageCommandUsage | ChatInputCommandUsage,
+  ) => Awaitable<CommandResponse | void>;
+}
+
+export type CommandObject =
+  | LegacyCommandObject
+  | SlashCommandObject
+  | BothCommandObject;
 
 export type FileData = {
   filePath: string;
-  fileContents: any;
+  fileContents: unknown;
 };
 
 export interface SubcommandObject
@@ -279,5 +313,5 @@ export interface SubcommandOptionObject
     InteractionCommandCapabilities {
   callback: (commandUsage: SubcommandUsage) => Awaitable<CommandResponse | void>;
   options?: ApplicationCommandOptionData[];
-  autocomplete?: Function;
+  autocomplete?: AutocompleteCallback<Subcommand>;
 }
