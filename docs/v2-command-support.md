@@ -19,6 +19,21 @@ const swag = await SWAG.create({
 
 Loading is local. After the Discord client is ready, call `deployCommands()` to synchronize slash commands, slash subcommand roots, and context-menu commands.
 
+## List loaded commands
+
+After `SWAG.create()` resolves, `swag.listCommands()` returns metadata for every loaded normal command, subcommand root, and context-menu command. Subcommand leaves appear in their root's `subcommands` array. Normal command aliases do not create duplicate entries, while user and message context menus with the same name remain distinct by `type`.
+
+```ts
+for (const command of swag.listCommands()) {
+  console.log(command.name, command.kind, command.type);
+  if (command.kind === "subcommand") {
+    console.log(command.subcommands.map((leaf) => leaf.name));
+  }
+}
+```
+
+Entries are sorted by name. The returned objects and alias arrays are copies, so changing them does not change registered commands. `description` is available for normal commands, subcommand roots, and leaves when defined; context menus have no description.
+
 ## Normal commands
 
 A file in `commandsDir` exports one command object. The filename is its command name.

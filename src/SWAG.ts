@@ -6,6 +6,7 @@ import EventHandler from "./event-handler/EventHandler";
 import type {
   CommandResponse,
   Events,
+  ListedCommandEntry,
   Options,
   PreconditionFailureEvent,
   Validations,
@@ -286,6 +287,53 @@ class SWAGCommands {
 
   public get messageCommandRouter(): MessageCommandRouter {
     return this._messageCommandRouter;
+  }
+
+  public listCommands(): ListedCommandEntry[] {
+    const commands: ListedCommandEntry[] = [];
+
+    const normalCommands = new Set(this._commandHandler?.commands.values() ?? []);
+    for (const command of normalCommands) {
+      commands.push({
+        kind: "command",
+        name: command.commandName,
+        description: command.commandObject.description,
+        type: command.commandObject.type,
+        aliases: [...(command.commandObject.aliases ?? [])],
+      });
+    }
+
+    for (const command of this._subcommandHandler?.commands.values() ?? []) {
+      commands.push({
+        kind: "subcommand",
+        name: command.commandName,
+        description: command.commandObject.description,
+        type: command.commandObject.type,
+        aliases: [...(command.commandObject.aliases ?? [])],
+        subcommands: command.options
+          .map((option) => ({
+            name: option.commandName,
+            description: option.optionObject.description,
+            aliases: [...(option.optionObject.aliases ?? [])],
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      });
+    }
+
+    for (const command of
+      this._contextMenuCommandHandler?.commands.values() ?? []) {
+      commands.push({
+        kind: "contextMenu",
+        name: command.commandName,
+        type: command.commandObject.type,
+      });
+    }
+
+    return commands.sort((a, b) =>
+      a.name.localeCompare(b.name) ||
+      a.kind.localeCompare(b.kind) ||
+      String(a.type).localeCompare(String(b.type)),
+    );
   }
 
   public async deployCommands(

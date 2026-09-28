@@ -2,6 +2,7 @@ import SWAG, { CommandType, MemoryPrefixStore, SWAGCommands } from "swagcommands
 import type {
   CommandObject,
   ContextMenuCommandObject,
+  ListedCommandEntry,
   PreconditionArrayResolvable,
   SubcommandObject,
   SubcommandOptionObject,
@@ -63,5 +64,6 @@ const invalidAutocomplete: CommandObject = {
 };
 
 const constructor: typeof SWAGCommands = SWAG;
+const listCommands: () => ListedCommandEntry[] = SWAG.prototype.listCommands;
 const prefixStore = new MemoryPrefixStore();
-void [legacy, slash, both, root, leaf, contextMenu, preconditions, missingContext, invalidAutocomplete, constructor, prefixStore];
+void [legacy, slash, both, root, leaf, contextMenu, preconditions, missingContext, invalidAutocomplete, constructor, listCommands, prefixStore];

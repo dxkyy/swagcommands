@@ -72,6 +72,40 @@ export interface Validations {
   syntax?: string;
 }
 
+export interface ListedCommand {
+  kind: "command";
+  name: string;
+  description?: string;
+  type: CommandType;
+  aliases: string[];
+}
+
+export interface ListedSubcommandOption {
+  name: string;
+  description?: string;
+  aliases: string[];
+}
+
+export interface ListedSubcommand {
+  kind: "subcommand";
+  name: string;
+  description?: string;
+  type: CommandType;
+  aliases: string[];
+  subcommands: ListedSubcommandOption[];
+}
+
+export interface ListedContextMenuCommand {
+  kind: "contextMenu";
+  name: string;
+  type: ApplicationCommandType.User | ApplicationCommandType.Message;
+}
+
+export type ListedCommandEntry =
+  | ListedCommand
+  | ListedSubcommand
+  | ListedContextMenuCommand;
+
 export interface CommandUsage {
   client: Client;
   instance: SWAGCommands;
