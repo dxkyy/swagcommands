@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const lifecycle = vi.hoisted(() => ({
   commandLoad: vi.fn<() => Promise<void>>(),
+  contextMenuLoad: vi.fn<() => Promise<void>>(),
   eventLoad: vi.fn<() => Promise<void>>(),
   eventRegister: vi.fn<() => void>(),
   featureLoad: vi.fn<() => Promise<void>>(),
@@ -16,6 +17,16 @@ vi.mock("../src/command-handler/CommandHandler", () => ({
 
     async load() {
       await lifecycle.commandLoad();
+    }
+  },
+}));
+
+vi.mock("../src/context-menu-handler/ContextMenuCommandHandler", () => ({
+  default: class ContextMenuCommandHandler {
+    commands = new Map();
+
+    async load() {
+      await lifecycle.contextMenuLoad();
     }
   },
 }));
@@ -83,6 +94,7 @@ const createSWAG = (options: Record<string, unknown>) => {
 describe("SWAG initialization", () => {
   beforeEach(() => {
     lifecycle.commandLoad.mockResolvedValue(undefined);
+    lifecycle.contextMenuLoad.mockResolvedValue(undefined);
     lifecycle.eventLoad.mockResolvedValue(undefined);
     lifecycle.featureLoad.mockResolvedValue(undefined);
     lifecycle.preconditionLoad.mockResolvedValue(undefined);
@@ -93,6 +105,7 @@ describe("SWAG initialization", () => {
     const instance = await createSWAG({
       client: createClient(),
       commandsDir: "/commands",
+      contextMenusDir: "/context-menus",
       events: { dir: "/events" },
       featuresDir: "/features",
       preconditionsDir: "/preconditions",
@@ -103,6 +116,7 @@ describe("SWAG initialization", () => {
     expect(instance.state).toBe("ready");
     expect(instance.isReady()).toBe(true);
     expect(lifecycle.commandLoad).toHaveBeenCalledOnce();
+    expect(lifecycle.contextMenuLoad).toHaveBeenCalledOnce();
     expect(lifecycle.subcommandLoad).toHaveBeenCalledOnce();
     expect(lifecycle.featureLoad).toHaveBeenCalledOnce();
     expect(lifecycle.preconditionLoad).toHaveBeenCalledOnce();

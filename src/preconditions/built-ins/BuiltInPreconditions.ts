@@ -2,6 +2,7 @@ import { PermissionFlagsBits } from "discord.js";
 
 import type {
   ChatInputCommandUsage,
+  ContextMenuCommandUsage,
   MessageCommandUsage,
   PreconditionCommand,
   PreconditionContext,
@@ -14,7 +15,10 @@ import type { PreconditionStore } from "../PreconditionStore";
 import type SWAG from "../../../typings";
 import { CooldownPrecondition } from "../../cooldowns/CooldownPrecondition";
 
-type Usage = MessageCommandUsage | ChatInputCommandUsage;
+type Usage =
+  | MessageCommandUsage
+  | ChatInputCommandUsage
+  | ContextMenuCommandUsage;
 
 export interface ArgumentCountContext extends PreconditionContext {
   expectedArgs?: string;
@@ -44,6 +48,14 @@ abstract class SharedFlowPrecondition extends AllFlowsPrecondition {
 
   public chatInputRun(
     usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext,
+  ) {
+    return this.run(usage, command, context);
+  }
+
+  public contextMenuRun(
+    usage: ContextMenuCommandUsage,
     command: PreconditionCommand,
     context: PreconditionContext,
   ) {

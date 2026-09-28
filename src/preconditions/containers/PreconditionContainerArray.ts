@@ -1,5 +1,6 @@
 import type {
   ChatInputCommandUsage,
+  ContextMenuCommandUsage,
   MessageCommandUsage,
   PreconditionCommand,
   PreconditionContext,
@@ -67,6 +68,14 @@ export class PreconditionContainerArray implements PreconditionContainer {
     return this.run((entry) => entry.chatInputRun(usage, command, context));
   }
 
+  public contextMenuRun(
+    usage: ContextMenuCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext = {},
+  ): Promise<PreconditionResult> {
+    return this.run((entry) => entry.contextMenuRun(usage, command, context));
+  }
+
   public messageCheck(
     usage: MessageCommandUsage,
     command: PreconditionCommand,
@@ -82,6 +91,16 @@ export class PreconditionContainerArray implements PreconditionContainer {
   ): Promise<PreconditionCheckResult> {
     return this.check((entry) =>
       entry.chatInputCheck(usage, command, context),
+    );
+  }
+
+  public contextMenuCheck(
+    usage: ContextMenuCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext = {},
+  ): Promise<PreconditionCheckResult> {
+    return this.check((entry) =>
+      entry.contextMenuCheck(usage, command, context),
     );
   }
 

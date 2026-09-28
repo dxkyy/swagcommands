@@ -1,7 +1,9 @@
 import {
   ApplicationCommandOptionData,
+  ApplicationCommandType,
   Client,
   CommandInteraction,
+  ContextMenuCommandInteraction,
   Guild,
   Message,
   GuildMember,
@@ -11,7 +13,9 @@ import {
   MessageCreateOptions,
   MessagePayload,
   MessageReplyOptions,
+  MessageContextMenuCommandInteraction,
   User,
+  UserContextMenuCommandInteraction,
 } from "discord.js";
 
 import CommandType from "./src/util/CommandType";
@@ -164,7 +168,10 @@ export type PreconditionResult =
 export interface PreconditionFailureEvent {
   command: PreconditionCommand;
   failure: Readonly<PreconditionFailure>;
-  usage: MessageCommandUsage | ChatInputCommandUsage;
+  usage:
+    | MessageCommandUsage
+    | ChatInputCommandUsage
+    | ContextMenuCommandUsage;
 }
 
 export interface ErrorReporter {
@@ -247,7 +254,10 @@ export interface CooldownPreconditionContext extends PreconditionContext {
 
 export function createCooldownId(
   command: PreconditionCommand,
-  usage: MessageCommandUsage | ChatInputCommandUsage,
+  usage:
+    | MessageCommandUsage
+    | ChatInputCommandUsage
+    | ContextMenuCommandUsage,
   scope?: CooldownScope,
   id?: string,
 ): string | undefined;
@@ -259,6 +269,7 @@ export default class SWAG {
   private _botOwners!: string[];
   private _validations!: Validations;
   private _commandHandler: CommandHandler | undefined;
+  private _contextMenuCommandHandler: ContextMenuCommandHandler | undefined;
   private _subcommandHandler: SubcommandHandler | undefined;
   private _eventHandler!: EventHandler;
   private _isConnectedToDB = false;
@@ -276,6 +287,7 @@ export default class SWAG {
   public get botOwners(): string[];
   public get validations(): Validations;
   public get commandHandler(): CommandHandler;
+  public get contextMenuCommandHandler(): ContextMenuCommandHandler;
   public get subcommandHandler(): SubcommandHandler;
   public get eventHandler(): EventHandler;
   public get isConnectedToDB(): boolean;
@@ -320,6 +332,7 @@ export type ClearCommandsTarget = CommandDeploymentTarget;
 export interface Options {
   client: Client;
   commandsDir?: string;
+  contextMenusDir?: string;
   preconditionsDir?: string;
   subcommandsDir?: string;
   featuresDir?: string;
@@ -400,7 +413,40 @@ export type ChatInputCommandUsage =
     })
   | ChatInputSubcommandUsage;
 
-export type PreconditionCommand = Command | Subcommand | SubcommandOption;
+export interface ContextMenuCommandUsageBase {
+  args: string[];
+  channel?: TextChannel;
+  client: Client;
+  guild?: Guild | null;
+  instance: SWAG;
+  member?: GuildMember;
+  message?: null;
+  text: string;
+  user: User;
+}
+
+export interface UserContextMenuCommandUsage
+  extends ContextMenuCommandUsageBase {
+  interaction: UserContextMenuCommandInteraction;
+  targetMember: GuildMember | null;
+  targetUser: User;
+}
+
+export interface MessageContextMenuCommandUsage
+  extends ContextMenuCommandUsageBase {
+  interaction: MessageContextMenuCommandInteraction;
+  targetMessage: Message;
+}
+
+export type ContextMenuCommandUsage =
+  | UserContextMenuCommandUsage
+  | MessageContextMenuCommandUsage;
+
+export type PreconditionCommand =
+  | Command
+  | ContextMenuCommand
+  | Subcommand
+  | SubcommandOption;
 
 export class Precondition {
   public readonly instance: SWAG;
@@ -416,6 +462,11 @@ export class Precondition {
     command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
+  public contextMenuRun?(
+    usage: ContextMenuCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
   public messageCommit?(
     usage: MessageCommandUsage,
     command: PreconditionCommand,
@@ -423,6 +474,11 @@ export class Precondition {
   ): Awaitable<PreconditionResult>;
   public chatInputCommit?(
     usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
+  public contextMenuCommit?(
+    usage: ContextMenuCommandUsage,
     command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
@@ -438,6 +494,11 @@ export abstract class AllFlowsPrecondition extends Precondition {
   ): Awaitable<PreconditionResult>;
   public abstract chatInputRun(
     usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
+  public abstract contextMenuRun(
+    usage: ContextMenuCommandUsage,
     command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
@@ -552,7 +613,10 @@ export type PreconditionSingleResolvable =
   | InlinePrecondition;
 
 export type InlinePrecondition = (
-  usage: MessageCommandUsage | ChatInputCommandUsage,
+  usage:
+    | MessageCommandUsage
+    | ChatInputCommandUsage
+    | ContextMenuCommandUsage,
   command: PreconditionCommand,
 ) => Awaitable<boolean | PreconditionResult>;
 
@@ -582,6 +646,11 @@ export interface PreconditionContainer {
     command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionResult>;
+  contextMenuRun(
+    usage: ContextMenuCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionResult>;
   messageCheck(
     usage: MessageCommandUsage,
     command: PreconditionCommand,
@@ -589,6 +658,11 @@ export interface PreconditionContainer {
   ): Promise<PreconditionCheckResult>;
   chatInputCheck(
     usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionCheckResult>;
+  contextMenuCheck(
+    usage: ContextMenuCommandUsage,
     command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionCheckResult>;
@@ -624,6 +698,11 @@ export class PreconditionContainerSingle implements PreconditionContainer {
     command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionResult>;
+  public contextMenuRun(
+    usage: ContextMenuCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionResult>;
   public messageCheck(
     usage: MessageCommandUsage,
     command: PreconditionCommand,
@@ -631,6 +710,11 @@ export class PreconditionContainerSingle implements PreconditionContainer {
   ): Promise<PreconditionCheckResult>;
   public chatInputCheck(
     usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionCheckResult>;
+  public contextMenuCheck(
+    usage: ContextMenuCommandUsage,
     command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionCheckResult>;
@@ -654,6 +738,11 @@ export class PreconditionContainerArray implements PreconditionContainer {
     command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionResult>;
+  public contextMenuRun(
+    usage: ContextMenuCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionResult>;
   public messageCheck(
     usage: MessageCommandUsage,
     command: PreconditionCommand,
@@ -661,6 +750,11 @@ export class PreconditionContainerArray implements PreconditionContainer {
   ): Promise<PreconditionCheckResult>;
   public chatInputCheck(
     usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionCheckResult>;
+  public contextMenuCheck(
+    usage: ContextMenuCommandUsage,
     command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionCheckResult>;
@@ -688,6 +782,59 @@ export interface MessageCommandCapabilities {
 export interface InteractionCommandCapabilities {
   description?: string;
   deferReply?: DeferSetting;
+}
+
+export interface ContextMenuCommandDefinitionBase {
+  deferReply?: DeferSetting;
+  guildOnly?: boolean;
+  init?: (client: Client, instance: SWAG) => Awaitable<void>;
+  ownerOnly?: boolean;
+  permissions?: readonly bigint[];
+  preconditions?: PreconditionArrayResolvable;
+  testOnly?: boolean;
+}
+
+export interface UserContextMenuCommandObject
+  extends ContextMenuCommandDefinitionBase {
+  callback: (
+    commandUsage: UserContextMenuCommandUsage,
+  ) => Awaitable<InteractionResponse | void>;
+  type: ApplicationCommandType.User;
+}
+
+export interface MessageContextMenuCommandObject
+  extends ContextMenuCommandDefinitionBase {
+  callback: (
+    commandUsage: MessageContextMenuCommandUsage,
+  ) => Awaitable<InteractionResponse | void>;
+  type: ApplicationCommandType.Message;
+}
+
+export type ContextMenuCommandObject =
+  | UserContextMenuCommandObject
+  | MessageContextMenuCommandObject;
+
+export class ContextMenuCommand {
+  public constructor(
+    instance: SWAG,
+    commandName: string,
+    commandObject: ContextMenuCommandObject,
+    preconditions: PreconditionContainerArray,
+  );
+  public get instance(): SWAG;
+  public get commandName(): string;
+  public get commandObject(): ContextMenuCommandObject;
+  public get preconditions(): PreconditionContainerArray;
+}
+
+export class ContextMenuCommandHandler {
+  public constructor(instance: SWAG, commandsDir: string);
+  public get commands(): Map<string, ContextMenuCommand>;
+  public getCommand(
+    name: string,
+    type: ApplicationCommandType.User | ApplicationCommandType.Message,
+  ): ContextMenuCommand | undefined;
+  public load(): Promise<void>;
 }
 
 export class MessageCommandRouter {

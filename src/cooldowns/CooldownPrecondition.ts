@@ -1,5 +1,6 @@
 import type {
   ChatInputCommandUsage,
+  ContextMenuCommandUsage,
   MessageCommandUsage,
   PreconditionCommand,
   PreconditionContext,
@@ -9,7 +10,10 @@ import {
   createPreconditionFactory,
 } from "../preconditions/Precondition";
 
-type CooldownUsage = MessageCommandUsage | ChatInputCommandUsage;
+type CooldownUsage =
+  | MessageCommandUsage
+  | ChatInputCommandUsage
+  | ContextMenuCommandUsage;
 
 export enum CooldownScope {
   User = "user",
@@ -62,6 +66,14 @@ export class CooldownPrecondition extends AllFlowsPrecondition {
     return this.run(usage, command, context);
   }
 
+  public contextMenuRun(
+    usage: ContextMenuCommandUsage,
+    command: PreconditionCommand,
+    context: CooldownPreconditionContext,
+  ) {
+    return this.run(usage, command, context);
+  }
+
   public messageCommit(
     usage: MessageCommandUsage,
     command: PreconditionCommand,
@@ -72,6 +84,14 @@ export class CooldownPrecondition extends AllFlowsPrecondition {
 
   public chatInputCommit(
     usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context: CooldownPreconditionContext,
+  ) {
+    return this.commit(usage, command, context);
+  }
+
+  public contextMenuCommit(
+    usage: ContextMenuCommandUsage,
     command: PreconditionCommand,
     context: CooldownPreconditionContext,
   ) {

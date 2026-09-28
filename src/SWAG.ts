@@ -33,6 +33,7 @@ import {
 } from "./deployment/CommandDeployer";
 import { CommandDeploymentError } from "./errors/CommandDeploymentError";
 import { CommandDefinitionError } from "./errors/CommandDefinitionError";
+import ContextMenuCommandHandler from "./context-menu-handler/ContextMenuCommandHandler";
 
 export const logger = new Logger();
 
@@ -46,6 +47,7 @@ class SWAGCommands {
   private _botOwners!: string[];
   private _validations!: Validations;
   private _commandHandler: CommandHandler | undefined;
+  private _contextMenuCommandHandler: ContextMenuCommandHandler | undefined;
   private _subcommandHandler: SubcommandHandler | undefined;
   private _eventHandler!: EventHandler;
   private _isConnectedToDB = false;
@@ -111,6 +113,7 @@ class SWAGCommands {
     let {
       client,
       commandsDir,
+      contextMenusDir,
       preconditionsDir,
       subcommandsDir,
       featuresDir,
@@ -162,6 +165,14 @@ class SWAGCommands {
       await this._commandHandler.load();
     }
 
+    if (contextMenusDir) {
+      this._contextMenuCommandHandler = new ContextMenuCommandHandler(
+        this as unknown as SWAG,
+        contextMenusDir,
+      );
+      await this._contextMenuCommandHandler.load();
+    }
+
     if (subcommandsDir) {
       this._subcommandHandler = new SubcommandHandler(
         this as unknown as SWAG,
@@ -196,9 +207,11 @@ class SWAGCommands {
       client,
       () => {
         const commands = this._commandHandler?.commands;
+        const contextMenus = this._contextMenuCommandHandler?.commands;
         const subcommands = this._subcommandHandler?.commands;
         return {
           commands: commands?.values(),
+          contextMenus: contextMenus?.values(),
           subcommands: subcommands?.values(),
         };
       },
@@ -224,6 +237,10 @@ class SWAGCommands {
 
   public get commandHandler(): CommandHandler | undefined {
     return this._commandHandler;
+  }
+
+  public get contextMenuCommandHandler(): ContextMenuCommandHandler | undefined {
+    return this._contextMenuCommandHandler;
   }
 
   public get subcommandHandler(): SubcommandHandler | undefined {

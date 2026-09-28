@@ -1,6 +1,7 @@
 import { PreconditionExecutionError } from "../../errors/PreconditionExecutionError";
 import type {
   ChatInputCommandUsage,
+  ContextMenuCommandUsage,
   MessageCommandUsage,
   Precondition,
   PreconditionCommand,
@@ -152,6 +153,65 @@ export class PreconditionContainerSingle implements PreconditionContainer {
     };
   }
 
+  public async contextMenuRun(
+    usage: ContextMenuCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext = {},
+  ) {
+    if (this.inline) {
+      return this.runInline(usage, command);
+    }
+    const precondition = this.store.get(this.name);
+    if (!precondition) {
+      return this.unavailable();
+    }
+
+    if (!precondition.contextMenuRun) {
+      return createPreconditionFailure(precondition.name, {
+        identifier: "PRECONDITION_MISSING_CONTEXT_MENU_HANDLER",
+        message: `The precondition "${precondition.name}" cannot run for context-menu commands.`,
+      });
+    }
+
+    try {
+      return await precondition.contextMenuRun(
+        usage,
+        command,
+        this.mergeContext(context),
+      );
+    } catch (error) {
+      throw new PreconditionExecutionError(
+        error,
+        precondition.name,
+        createErrorContext(command, "interaction"),
+      );
+    }
+  }
+
+  public async contextMenuCheck(
+    usage: ContextMenuCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext = {},
+  ): Promise<PreconditionCheckResult> {
+    const result = await this.contextMenuRun(usage, command, context);
+    if (!result.success) return result;
+
+    const precondition = this.inline ? undefined : this.store.get(this.name);
+    const mergedContext = this.mergeContext(context);
+    return {
+      commits: precondition?.contextMenuCommit
+        ? [() =>
+            this.runContextMenuCommit(
+              precondition,
+              usage,
+              command,
+              mergedContext,
+            )]
+        : [],
+      success: true,
+    };
+  }
+
   private mergeContext(context: PreconditionContext): PreconditionContext {
     return Object.freeze({ ...context, ...this.context });
   }
@@ -164,7 +224,7 @@ export class PreconditionContainerSingle implements PreconditionContainer {
   }
 
   private async runInline(
-    usage: MessageCommandUsage | ChatInputCommandUsage,
+    usage: MessageCommandUsage | ChatInputCommandUsage | ContextMenuCommandUsage,
     command: PreconditionCommand,
   ): Promise<PreconditionResult> {
     try {
@@ -184,6 +244,23 @@ export class PreconditionContainerSingle implements PreconditionContainer {
           command,
           "message" in usage && usage.message ? "message" : "interaction",
         ),
+      );
+    }
+  }
+
+  private async runContextMenuCommit(
+    precondition: Precondition,
+    usage: ContextMenuCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext,
+  ): Promise<PreconditionResult> {
+    try {
+      return await precondition.contextMenuCommit!(usage, command, context);
+    } catch (error) {
+      throw new PreconditionExecutionError(
+        error,
+        precondition.name,
+        createErrorContext(command, "interaction"),
       );
     }
   }

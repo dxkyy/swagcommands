@@ -67,6 +67,10 @@ describe("Precondition", () => {
         return this.check();
       }
 
+      public contextMenuRun() {
+        return this.check();
+      }
+
       private check() {
         return this.ok();
       }
@@ -80,6 +84,9 @@ describe("Precondition", () => {
     ).toEqual({ success: true });
     expect(
       await allFlowsPrecondition.chatInputRun({} as never, {} as never, {}),
+    ).toEqual({ success: true });
+    expect(
+      await allFlowsPrecondition.contextMenuRun({} as never, {} as never, {}),
     ).toEqual({ success: true });
   });
 

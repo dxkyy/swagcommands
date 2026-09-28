@@ -4,8 +4,10 @@ import type SWAG from "../../typings";
 import type {
   ChatInputSubcommandUsage,
   CommandUsage,
+  ContextMenuCommandUsage,
   MessageSubcommandUsage,
 } from "../../typings";
+import type ContextMenuCommand from "../context-menu-handler/ContextMenuCommand";
 import type SubcommandOption from "../subcommand-handler/SubcommandOption";
 import type Subcommand from "../subcommand-handler/Subcommand";
 import type Command from "../command-handler/Command";
@@ -21,7 +23,11 @@ export type Awaitable<T> = T | Promise<T>;
 
 export type PreconditionContext = Readonly<Record<PropertyKey, unknown>>;
 
-export type PreconditionCommand = Command | Subcommand | SubcommandOption;
+export type PreconditionCommand =
+  | Command
+  | ContextMenuCommand
+  | Subcommand
+  | SubcommandOption;
 
 export type MessageCommandUsage =
   | (CommandUsage & {
@@ -36,6 +42,8 @@ export type ChatInputCommandUsage =
       message?: null;
     })
   | ChatInputSubcommandUsage;
+
+export type { ContextMenuCommandUsage } from "../../typings";
 
 export class Precondition {
   public readonly instance: SWAG;
@@ -58,6 +66,12 @@ export class Precondition {
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
 
+  public contextMenuRun?(
+    usage: ContextMenuCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
+
   public messageCommit?(
     usage: MessageCommandUsage,
     command: PreconditionCommand,
@@ -66,6 +80,12 @@ export class Precondition {
 
   public chatInputCommit?(
     usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
+
+  public contextMenuCommit?(
+    usage: ContextMenuCommandUsage,
     command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
@@ -88,6 +108,12 @@ export abstract class AllFlowsPrecondition extends Precondition {
 
   public abstract override chatInputRun(
     usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context: PreconditionContext,
+  ): Awaitable<PreconditionResult>;
+
+  public abstract override contextMenuRun(
+    usage: ContextMenuCommandUsage,
     command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;

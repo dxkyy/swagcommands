@@ -1,5 +1,6 @@
 import type {
   ChatInputCommandUsage,
+  ContextMenuCommandUsage,
   MessageCommandUsage,
   PreconditionCommand,
   PreconditionContext,
@@ -21,7 +22,7 @@ export interface PreconditionSingleResolvableDetails {
 }
 
 export type InlinePrecondition = (
-  usage: MessageCommandUsage | ChatInputCommandUsage,
+  usage: MessageCommandUsage | ChatInputCommandUsage | ContextMenuCommandUsage,
   command: PreconditionCommand,
 ) => boolean | PreconditionResult | Promise<boolean | PreconditionResult>;
 
@@ -58,6 +59,12 @@ export interface PreconditionContainer {
     context?: PreconditionContext,
   ): Promise<PreconditionResult>;
 
+  contextMenuRun(
+    usage: ContextMenuCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionResult>;
+
   messageCheck(
     usage: MessageCommandUsage,
     command: PreconditionCommand,
@@ -66,6 +73,12 @@ export interface PreconditionContainer {
 
   chatInputCheck(
     usage: ChatInputCommandUsage,
+    command: PreconditionCommand,
+    context?: PreconditionContext,
+  ): Promise<PreconditionCheckResult>;
+
+  contextMenuCheck(
+    usage: ContextMenuCommandUsage,
     command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionCheckResult>;

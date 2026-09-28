@@ -1,6 +1,8 @@
 import {
+  ApplicationCommandData,
   ApplicationCommandOptionData,
   ApplicationCommandOptionType,
+  ApplicationCommandType,
   ApplicationCommandStringOptionData,
   ApplicationCommandSubCommandData,
   ChatInputApplicationCommandData,
@@ -12,24 +14,27 @@ import Subcommand from "../subcommand-handler/Subcommand";
 import SubcommandOption from "../subcommand-handler/SubcommandOption";
 import CommandType from "../util/CommandType";
 import { CommandObject } from "../../typings";
+import ContextMenuCommand from "../context-menu-handler/ContextMenuCommand";
 
 export interface CommandManifestSources {
   commands?: Iterable<Command>;
+  contextMenus?: Iterable<ContextMenuCommand>;
   subcommands?: Iterable<Subcommand>;
 }
 
 export interface CommandManifests {
-  global: readonly ChatInputApplicationCommandData[];
-  test: readonly ChatInputApplicationCommandData[];
+  global: readonly ApplicationCommandData[];
+  test: readonly ApplicationCommandData[];
 }
 
 type ManifestScope = keyof CommandManifests;
 
 export function buildCommandManifests({
   commands = [],
+  contextMenus = [],
   subcommands = [],
 }: CommandManifestSources): CommandManifests {
-  const manifests: Record<ManifestScope, ChatInputApplicationCommandData[]> = {
+  const manifests: Record<ManifestScope, ApplicationCommandData[]> = {
     global: [],
     test: [],
   };
@@ -78,6 +83,14 @@ export function buildCommandManifests({
     );
   }
 
+  for (const command of contextMenus) {
+    const scope = getScope(command.commandObject.testOnly);
+    addToManifest(manifests, names, scope, {
+      name: command.commandName,
+      type: command.commandObject.type,
+    });
+  }
+
   return {
     global: Object.freeze(sortCommands(manifests.global)),
     test: Object.freeze(sortCommands(manifests.test)),
@@ -89,19 +102,20 @@ function getScope(testOnly?: boolean): ManifestScope {
 }
 
 function addToManifest(
-  manifests: Record<ManifestScope, ChatInputApplicationCommandData[]>,
+  manifests: Record<ManifestScope, ApplicationCommandData[]>,
   names: Record<ManifestScope, Set<string>>,
   scope: ManifestScope,
-  command: ChatInputApplicationCommandData,
+  command: ApplicationCommandData,
 ): void {
-  if (names[scope].has(command.name)) {
+  const identity = `${command.type ?? ApplicationCommandType.ChatInput}:${command.name}`;
+  if (names[scope].has(identity)) {
     throw new CommandDefinitionError(
       `Application command "${command.name}" is defined more than once in the ${scope} deployment scope.`,
       { commandName: command.name },
     );
   }
 
-  names[scope].add(command.name);
+  names[scope].add(identity);
   manifests[scope].push(command);
 }
 
@@ -229,7 +243,11 @@ function isArgumentOption(
 }
 
 function sortCommands(
-  commands: ChatInputApplicationCommandData[],
-): ChatInputApplicationCommandData[] {
-  return commands.sort((left, right) => left.name.localeCompare(right.name));
+  commands: ApplicationCommandData[],
+): ApplicationCommandData[] {
+  return commands.sort((left, right) =>
+    left.name.localeCompare(right.name) ||
+    (left.type ?? ApplicationCommandType.ChatInput) -
+      (right.type ?? ApplicationCommandType.ChatInput),
+  );
 }

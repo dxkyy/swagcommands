@@ -31,6 +31,7 @@ interface ResolveChatInputPreconditionsOptions {
 interface ResolvePreconditionsOptions
   extends ResolveChatInputPreconditionsOptions {
   requireChatInput: boolean;
+  requireContextMenu: boolean;
   requireMessage: boolean;
 }
 
@@ -42,6 +43,7 @@ export function resolveCommandPreconditions(
   return resolvePreconditions(store, entries, {
     ...options,
     requireChatInput: options.commandType !== "LEGACY",
+    requireContextMenu: false,
     requireMessage: options.commandType !== "SLASH",
   });
 }
@@ -54,6 +56,20 @@ export function resolveChatInputPreconditions(
   return resolvePreconditions(store, entries, {
     ...options,
     requireChatInput: true,
+    requireContextMenu: false,
+    requireMessage: false,
+  });
+}
+
+export function resolveContextMenuPreconditions(
+  store: PreconditionLookup,
+  entries: DeclaredPreconditionArrayResolvable | undefined,
+  options: ResolveChatInputPreconditionsOptions,
+): PreconditionContainerArray {
+  return resolvePreconditions(store, entries, {
+    ...options,
+    requireChatInput: false,
+    requireContextMenu: true,
     requireMessage: false,
   });
 }
@@ -175,6 +191,16 @@ function validateSingle(
     throw definitionError(
       options,
       `The precondition "${name}" does not support chat-input commands.`,
+    );
+  }
+
+  if (
+    options.requireContextMenu &&
+    typeof precondition.contextMenuRun !== "function"
+  ) {
+    throw definitionError(
+      options,
+      `The precondition "${name}" does not support context-menu commands.`,
     );
   }
 }
