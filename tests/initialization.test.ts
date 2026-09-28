@@ -1,4 +1,5 @@
-import { MessageFlags } from "discord.js";
+import { Events as DiscordEvents, MessageFlags } from "discord.js";
+import { EventEmitter } from "node:events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const lifecycle = vi.hoisted(() => ({
@@ -7,6 +8,7 @@ const lifecycle = vi.hoisted(() => ({
   eventLoad: vi.fn<() => Promise<void>>(),
   eventRegister: vi.fn<() => void>(),
   featureLoad: vi.fn<() => Promise<void>>(),
+  featureHasPhase: vi.fn<(_phase: string) => boolean>(),
   featureRunPhase: vi.fn<(_phase: string) => Promise<void>>(),
   preconditionLoad: vi.fn<() => Promise<void>>(),
   subcommandLoad: vi.fn<() => Promise<void>>(),
@@ -50,6 +52,10 @@ vi.mock("../src/util/FeaturesHandler", () => ({
 
     async runPhase(phase: string) {
       await lifecycle.featureRunPhase(phase);
+    }
+
+    hasPhase(phase: string) {
+      return lifecycle.featureHasPhase(phase);
     }
   },
 }));
@@ -104,6 +110,7 @@ describe("SWAG initialization", () => {
     lifecycle.contextMenuLoad.mockResolvedValue(undefined);
     lifecycle.eventLoad.mockResolvedValue(undefined);
     lifecycle.featureLoad.mockResolvedValue(undefined);
+    lifecycle.featureHasPhase.mockReturnValue(true);
     lifecycle.featureRunPhase.mockResolvedValue(undefined);
     lifecycle.preconditionLoad.mockResolvedValue(undefined);
     lifecycle.subcommandLoad.mockResolvedValue(undefined);
@@ -282,6 +289,75 @@ describe("SWAG initialization", () => {
       },
     } satisfies Partial<InitializationError>);
     expect(lifecycle.commandLoad).not.toHaveBeenCalled();
+  });
+
+  it("starts client-ready features once when the client is already ready", async () => {
+    const client = {
+      ...createClient(),
+      isReady: vi.fn(() => true),
+    };
+    const instance = await createSWAG({ client, featuresDir: "/features" });
+    const firstStart = instance.startFeatures();
+    const secondStart = instance.startFeatures();
+
+    expect(firstStart).toBe(secondStart);
+    await firstStart;
+    await instance.startFeatures();
+    expect(lifecycle.featureRunPhase.mock.calls).toEqual([
+      [FeaturePhase.BeforeCommands],
+      [FeaturePhase.AfterCommands],
+      [FeaturePhase.ClientReady],
+    ]);
+  });
+
+  it("waits for client readiness before running client-ready features", async () => {
+    let ready = false;
+    const client = Object.assign(new EventEmitter(), createClient(), {
+      isReady: vi.fn(() => ready),
+    });
+    const instance = await createSWAG({ client, featuresDir: "/features" });
+    const starting = instance.startFeatures();
+
+    expect(lifecycle.featureRunPhase).not.toHaveBeenCalledWith(FeaturePhase.ClientReady);
+    ready = true;
+    client.emit(DiscordEvents.ClientReady, client);
+    await starting;
+
+    expect(lifecycle.featureRunPhase).toHaveBeenCalledWith(FeaturePhase.ClientReady);
+    expect(client.listenerCount(DiscordEvents.ClientReady)).toBe(0);
+  });
+
+  it("propagates client-ready feature failures and does not rerun them", async () => {
+    const failure = new FeatureExecutionError(new Error("analytics failed"), {
+      featureName: "analytics",
+      filePath: "/features/analytics.ts",
+    });
+    lifecycle.featureRunPhase.mockImplementation(async (phase) => {
+      if (phase === FeaturePhase.ClientReady) {
+        throw failure;
+      }
+    });
+    const instance = await createSWAG({
+      client: { ...createClient(), isReady: () => true },
+      featuresDir: "/features",
+    });
+
+    await expect(instance.startFeatures()).rejects.toBe(failure);
+    await expect(instance.startFeatures()).rejects.toBe(failure);
+    expect(lifecycle.featureRunPhase.mock.calls.filter(([phase]) =>
+      phase === FeaturePhase.ClientReady,
+    )).toHaveLength(1);
+  });
+
+  it("does not wait for client readiness without client-ready features", async () => {
+    lifecycle.featureHasPhase.mockReturnValue(false);
+    const instance = await createSWAG({
+      client: createClient(),
+      featuresDir: "/features",
+    });
+
+    await expect(instance.startFeatures()).resolves.toBeUndefined();
+    expect(lifecycle.featureRunPhase).not.toHaveBeenCalledWith(FeaturePhase.ClientReady);
   });
 
   it("rejects initialization when no Discord client is provided", async () => {

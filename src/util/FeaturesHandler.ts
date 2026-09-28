@@ -1,6 +1,7 @@
 import type { Client } from "discord.js";
 import type SWAG from "../SWAG";
 import { FeatureExecutionError } from "../errors/FeatureExecutionError";
+import { FeatureDefinitionError } from "../errors/FeatureDefinitionError";
 import {
   discoverFeatures,
   type DiscoveredFeature,
@@ -35,12 +36,22 @@ class FeaturesHandler {
     return run;
   }
 
+  public hasPhase(phase: FeaturePhase): boolean {
+    return this.features.some((feature) => feature.phase === phase);
+  }
+
   private async executePhase(phase: FeaturePhase): Promise<void> {
     await this.load();
 
     for (const feature of this.features) {
-      if (feature.phase !== phase || feature.kind !== "once") {
+      if (feature.phase !== phase) {
         continue;
+      }
+      if (feature.kind === "recurring") {
+        throw new FeatureDefinitionError(
+          `Recurring feature "${feature.name}" cannot start until recurring scheduling is implemented.`,
+          { featureName: feature.name, filePath: feature.filePath },
+        );
       }
 
       try {

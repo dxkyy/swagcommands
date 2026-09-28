@@ -28,9 +28,10 @@ const swag = await SWAG.create({
 });
 
 await client.login(process.env.DISCORD_TOKEN);
+await swag.startFeatures();
 ```
 
-`SWAG.create()` resolves only after command, subcommand, context-menu, feature, and event files have loaded, their asynchronous initialization hooks have completed, and event listeners have been registered. If any of that work fails, the promise rejects with an `InitializationError`; a partially initialized instance is not returned.
+`SWAG.create()` resolves after command, subcommand, context-menu, and event files load, feature discovery completes, `BeforeCommands` and `AfterCommands` one-time features finish, and event listeners are registered. `ClientReady` one-time features run through `startFeatures()`, which waits for the Discord client to become ready and can be called more than once without rerunning them. A plain function feature defaults to `ClientReady`. If local initialization fails, `SWAG.create()` rejects with an `InitializationError`; a partially initialized instance is not returned.
 
 The instance exposes `state` and `isReady()` for lifecycle inspection:
 

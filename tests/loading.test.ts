@@ -25,6 +25,7 @@ import EventHandler from "../src/event-handler/EventHandler";
 import FeaturesHandler from "../src/util/FeaturesHandler";
 import { FeaturePhase } from "../src/features/FeaturePhase";
 import { FeatureExecutionError } from "../src/errors/FeatureExecutionError";
+import { FeatureDefinitionError } from "../src/errors/FeatureDefinitionError";
 import SubcommandHandler from "../src/subcommand-handler/SubcommandHandler";
 import { CommandDefinitionError } from "../src/errors/CommandDefinitionError";
 import { Precondition } from "../src/preconditions/Precondition";
@@ -199,6 +200,49 @@ describe("explicit handler loading", () => {
         filePath: "/features/setup.ts",
       },
     } satisfies Partial<FeatureExecutionError>);
+  });
+
+  it("runs plain functions once at the client-ready phase", async () => {
+    const run = vi.fn();
+    loading.files.set("/features", [
+      { fileContents: run, filePath: "/features/analytics.ts" },
+    ]);
+    const client = {};
+    const instance = createInstance();
+    const handler = new FeaturesHandler(instance as never, "/features", client as never);
+
+    await handler.load();
+    await handler.runPhase(FeaturePhase.AfterCommands);
+    expect(run).not.toHaveBeenCalled();
+    expect(handler.hasPhase(FeaturePhase.ClientReady)).toBe(true);
+
+    await handler.runPhase(FeaturePhase.ClientReady);
+    await handler.runPhase(FeaturePhase.ClientReady);
+    expect(run).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledWith({
+      client,
+      instance,
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it("rejects recurring definitions until scheduling is available", async () => {
+    loading.files.set("/features", [
+      {
+        fileContents: { everyMs: 1000, run: vi.fn() },
+        filePath: "/features/job.ts",
+      },
+    ]);
+    const handler = new FeaturesHandler(
+      createInstance() as never,
+      "/features",
+      {} as never,
+    );
+
+    await expect(handler.runPhase(FeaturePhase.ClientReady)).rejects.toMatchObject({
+      code: "SWAG_FEATURE_DEFINITION_INVALID",
+      context: { featureName: "job", filePath: "/features/job.ts" },
+    } satisfies Partial<FeatureDefinitionError>);
   });
 
   it("does not deploy slash commands while loading command definitions", async () => {

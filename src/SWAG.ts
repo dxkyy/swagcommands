@@ -1,4 +1,4 @@
-import { Client, MessageFlags } from "discord.js";
+import { Client, Events as DiscordEvents, MessageFlags } from "discord.js";
 
 import CommandHandler from "./command-handler/CommandHandler";
 import MessageCommandRouter from "./command-handler/MessageCommandRouter";
@@ -61,6 +61,7 @@ class SWAGCommands {
   private _commandDeployer!: CommandDeployer;
   private _state: LifecycleState = "idle";
   private _initialization: Promise<void> | undefined;
+  private _featuresStart: Promise<void> | undefined;
   private readonly _options: Options;
   private readonly _commandExecutor: CommandExecutor;
   private readonly _responseHandler: ResponseHandler;
@@ -282,6 +283,40 @@ class SWAGCommands {
 
   public isReady(): boolean {
     return this._state === "ready";
+  }
+
+  public startFeatures(): Promise<void> {
+    this._featuresStart ??= this.performStartFeatures();
+    return this._featuresStart;
+  }
+
+  private async performStartFeatures(): Promise<void> {
+    if (this._state !== "ready") {
+      throw new Error("SWAGCommands must finish initializing before features can start.");
+    }
+    if (!this._featuresHandler?.hasPhase(FeaturePhase.ClientReady)) {
+      return;
+    }
+
+    await this.waitForClientReady();
+    await this._featuresHandler.runPhase(FeaturePhase.ClientReady);
+  }
+
+  private async waitForClientReady(): Promise<void> {
+    if (this._client.isReady()) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      const onReady = () => {
+        this._client.off(DiscordEvents.ClientReady, onReady);
+        resolve();
+      };
+      this._client.once(DiscordEvents.ClientReady, onReady);
+      if (this._client.isReady()) {
+        onReady();
+      }
+    });
   }
 
   public get responseHandler(): ResponseHandler {
