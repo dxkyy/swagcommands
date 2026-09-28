@@ -8,6 +8,7 @@ import { PreconditionStore } from "../../src/preconditions/PreconditionStore";
 import { PreconditionContainerArray } from "../../src/preconditions/containers/PreconditionContainerArray";
 import Subcommand from "../../src/subcommand-handler/Subcommand";
 import SubcommandOption from "../../src/subcommand-handler/SubcommandOption";
+import CommandType from "../../src/util/CommandType";
 
 const createInteraction = () => ({
   channel: {},
@@ -74,7 +75,7 @@ const createSubcommand = (
   new Subcommand(
     instance,
     "admin",
-    { description: "Administration" },
+    { description: "Administration", type: CommandType.SLASH },
     [option],
     rootPreconditions,
   );

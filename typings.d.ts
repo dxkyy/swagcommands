@@ -357,10 +357,9 @@ export interface CommandUsage {
   channel?: TextChannel;
 }
 
-export interface SubCommandUsage {
+export interface SubcommandUsageBase {
   client: Client;
   instance: SWAG;
-  interaction?: CommandInteraction;
   args: string[];
   text: string;
   guild?: Guild | null;
@@ -369,19 +368,33 @@ export interface SubCommandUsage {
   channel?: TextChannel;
 }
 
-export type MessageCommandUsage = CommandUsage & {
+export type MessageSubcommandUsage = SubcommandUsageBase & {
   interaction?: null;
   message: Message;
 };
+
+export type ChatInputSubcommandUsage = SubcommandUsageBase & {
+  interaction: CommandInteraction;
+  message?: null;
+};
+
+export type SubcommandUsage =
+  | MessageSubcommandUsage
+  | ChatInputSubcommandUsage;
+
+export type MessageCommandUsage =
+  | (CommandUsage & {
+      interaction?: null;
+      message: Message;
+    })
+  | MessageSubcommandUsage;
 
 export type ChatInputCommandUsage =
   | (CommandUsage & {
       interaction: CommandInteraction;
       message?: null;
     })
-  | (SubCommandUsage & {
-      interaction: CommandInteraction;
-    });
+  | ChatInputSubcommandUsage;
 
 export type PreconditionCommand = Command | Subcommand | SubcommandOption;
 
@@ -649,13 +662,9 @@ export class PreconditionContainerArray implements PreconditionContainer {
   ): Promise<PreconditionCheckResult>;
 }
 
-export interface CommandObject {
-  callback: (commandUsage: CommandUsage) => Awaitable<CommandResponse | void>;
-  type: CommandType;
+export interface CommandDefinitionBase {
   preconditions?: PreconditionArrayResolvable;
-  init?: function;
-  description?: string;
-  aliases?: string[];
+  init?: (client: Client, instance: SWAG) => Awaitable<void>;
   testOnly?: boolean;
   guildOnly?: boolean;
   ownerOnly?: boolean;
@@ -665,9 +674,26 @@ export interface CommandObject {
   maxArgs?: number;
   correctSyntax?: string;
   expectedArgs?: string;
+}
+
+export interface MessageCommandCapabilities {
+  aliases?: readonly string[];
+  reply?: boolean;
+}
+
+export interface InteractionCommandCapabilities {
+  description?: string;
+  deferReply?: DeferSetting;
+}
+
+export interface CommandObject
+  extends CommandDefinitionBase,
+    MessageCommandCapabilities,
+    InteractionCommandCapabilities {
+  callback: (commandUsage: CommandUsage) => Awaitable<CommandResponse | void>;
+  type: CommandType;
   options?: ApplicationCommandOptionData[];
   autocomplete?: function;
-  reply?: boolean;
 }
 
 export type FileData = {
@@ -689,35 +715,21 @@ export class Command {
   public get preconditions(): PreconditionContainerArray;
 }
 
-export interface SubcommandObject {
-  description: string;
-  preconditions?: PreconditionArrayResolvable;
-  testOnly?: boolean;
-  guildOnly?: boolean;
-  ownerOnly?: boolean;
-  permissions?: readonly bigint[];
-  minArgs?: number;
-  maxArgs?: number;
-  expectedArgs?: string;
+export interface SubcommandObject
+  extends CommandDefinitionBase,
+    MessageCommandCapabilities,
+    InteractionCommandCapabilities {
+  type: CommandType;
 }
 
-export interface SubcommandOptionObject {
-  callback: (commandUsage: SubCommandUsage) => Awaitable<CommandResponse | void>;
-  preconditions?: PreconditionArrayResolvable;
-  init?: function;
-  name: string;
-  description?: string;
-  testOnly?: boolean;
-  guildOnly?: boolean;
-  ownerOnly?: boolean;
-  permissions?: readonly bigint[];
-  minArgs?: number;
-  maxArgs?: number;
-  expectedArgs?: string;
-  deferReply?: DeferSetting;
+export interface SubcommandOptionObject
+  extends CommandDefinitionBase,
+    MessageCommandCapabilities,
+    InteractionCommandCapabilities {
+  callback: (commandUsage: SubcommandUsage) => Awaitable<CommandResponse | void>;
+  name?: string;
   options?: ApplicationCommandOptionData[];
   autocomplete?: function;
-  reply?: boolean;
 }
 
 export class SubcommandOption {

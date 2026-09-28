@@ -1,7 +1,10 @@
 import type { CommandInteraction, Message } from "discord.js";
 
 import type SWAG from "../../typings";
-import type { CommandUsage, SubCommandUsage } from "../../typings";
+import type {
+  ChatInputSubcommandUsage,
+  CommandUsage,
+} from "../../typings";
 import type Command from "../command-handler/Command";
 import type SubcommandOption from "../subcommand-handler/SubcommandOption";
 import type Subcommand from "../subcommand-handler/Subcommand";
@@ -29,9 +32,7 @@ export type ChatInputCommandUsage =
       interaction: CommandInteraction;
       message?: null;
     })
-  | (SubCommandUsage & {
-      interaction: CommandInteraction;
-    });
+  | ChatInputSubcommandUsage;
 
 export class Precondition {
   public readonly instance: SWAG;

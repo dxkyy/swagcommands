@@ -6,7 +6,7 @@ import {
   TextChannel,
 } from "discord.js";
 
-import SWAG, { CommandUsage, SubCommandUsage } from "../../typings";
+import SWAG, { CommandUsage, SubcommandUsage } from "../../typings";
 import Command from "../command-handler/Command";
 import CommandType from "../util/CommandType";
 import { CommandExecutionError } from "../errors/CommandExecutionError";
@@ -356,7 +356,7 @@ class CommandExecutor {
     command: SubcommandOption,
     args: string[],
     interaction: CommandInteraction,
-  ): SubCommandUsage {
+  ): SubcommandUsage {
     return {
       args,
       channel: interaction.channel as TextChannel,

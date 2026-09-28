@@ -131,7 +131,7 @@ describe("application command manifest builder", () => {
   it("builds subcommands and subcommand groups", () => {
     const command = createSubcommand(
       "admin",
-      { description: "Administration" },
+      { description: "Administration", type: CommandType.SLASH },
       [
         {
           fileName: "status",
@@ -218,7 +218,7 @@ describe("application command manifest builder", () => {
 
     const duplicate = createSubcommand(
       "ping",
-      { description: "Duplicate" },
+      { description: "Duplicate", type: CommandType.SLASH },
       [],
     );
     expect(() =>
@@ -232,7 +232,7 @@ describe("application command manifest builder", () => {
   it("rejects malformed nested subcommand options", () => {
     const malformed = createSubcommand(
       "admin",
-      { description: "Administration" },
+      { description: "Administration", type: CommandType.SLASH },
       [
         {
           fileName: "mixed",

@@ -97,7 +97,7 @@ describe("autocomplete execution", () => {
     const command = new Subcommand(
       {} as never,
       "admin",
-      { description: "Administration" },
+      { description: "Administration", type: CommandType.SLASH },
       [option],
       createPreconditions(),
     );
