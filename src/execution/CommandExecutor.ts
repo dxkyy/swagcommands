@@ -133,48 +133,84 @@ class CommandExecutor {
   public async executeSubcommand(
     command: SubcommandOption,
     args: string[],
-    interaction: CommandInteraction,
+    message: Message | null,
+    interaction: CommandInteraction | null,
   ): Promise<void> {
-    const { callback, deferReply } = command.optionObject;
+    if ((!message && !interaction) || (message && interaction)) {
+      return;
+    }
+
+    const { callback } = command.optionObject;
+    const { type } = command.parent.commandObject;
+    if (
+      (message && type === CommandType.SLASH) ||
+      (interaction && type === CommandType.LEGACY)
+    ) {
+      return;
+    }
+
+    const deferReply =
+      command.optionObject.deferReply ??
+      command.parent.commandObject.deferReply ??
+      false;
+    const reply =
+      command.optionObject.reply ?? command.parent.commandObject.reply ?? false;
     const context = {
       commandName: command.parent.commandName,
-      invocationKind: "interaction" as const,
+      invocationKind: (message ? "message" : "interaction") as
+        | "message"
+        | "interaction",
       subcommandName: command.commandName,
     };
 
-    const usage = this.createSubcommandUsage(command, args, interaction);
+    const usage = this.createSubcommandUsage(
+      command,
+      args,
+      message,
+      interaction,
+    );
 
     try {
-      const rootResult = await command.parent.preconditions.chatInputCheck(
-        usage as ChatInputCommandUsage,
-        command.parent,
-      );
+      const rootResult = message
+        ? await command.parent.preconditions.messageCheck(
+            usage as MessageCommandUsage,
+            command.parent as never,
+          )
+        : await command.parent.preconditions.chatInputCheck(
+            usage as ChatInputCommandUsage,
+            command.parent,
+          );
       if (
         !(await this.handlePreconditionResult(
           rootResult,
-          usage as ChatInputCommandUsage,
+          usage,
           command.parent,
-          null,
+          message,
           interaction,
-          false,
+          reply,
           context,
         ))
       ) {
         return;
       }
 
-      const optionResult = await command.preconditions.chatInputCheck(
-        usage as ChatInputCommandUsage,
-        command,
-      );
+      const optionResult = message
+        ? await command.preconditions.messageCheck(
+            usage as MessageCommandUsage,
+            command as never,
+          )
+        : await command.preconditions.chatInputCheck(
+            usage as ChatInputCommandUsage,
+            command,
+          );
       if (
         !(await this.handlePreconditionResult(
           optionResult,
-          usage as ChatInputCommandUsage,
+          usage,
           command,
-          null,
+          message,
           interaction,
-          false,
+          reply,
           context,
         ))
       ) {
@@ -184,27 +220,27 @@ class CommandExecutor {
       if (
         !(await this.runPreconditionCommits(
           rootResult,
-          usage as ChatInputCommandUsage,
+          usage,
           command.parent,
-          null,
+          message,
           interaction,
-          false,
+          reply,
           context,
         )) ||
         !(await this.runPreconditionCommits(
           optionResult,
-          usage as ChatInputCommandUsage,
+          usage,
           command,
-          null,
+          message,
           interaction,
-          false,
+          reply,
           context,
         ))
       ) {
         return;
       }
 
-      if (deferReply) {
+      if (interaction && deferReply) {
         const deferred = await this._instance.responseHandler.defer(
           interaction,
           deferReply,
@@ -213,6 +249,8 @@ class CommandExecutor {
         if (!deferred) {
           return;
         }
+      } else if (message && deferReply) {
+        await this._instance.responseHandler.indicateTyping(message, context);
       }
 
       const response = await callback(usage);
@@ -220,11 +258,20 @@ class CommandExecutor {
         return;
       }
 
-      await this._instance.responseHandler.respondToInteraction(
-        interaction,
-        response as InteractionResponse,
-        context,
-      );
+      if (interaction) {
+        await this._instance.responseHandler.respondToInteraction(
+          interaction,
+          response as InteractionResponse,
+          context,
+        );
+      } else if (message) {
+        await this._instance.responseHandler.respondToMessage(
+          message,
+          response as MessageResponse,
+          reply,
+          context,
+        );
+      }
     } catch (error) {
       await this.reportExecutionError(error, context);
     }
@@ -355,18 +402,35 @@ class CommandExecutor {
   private createSubcommandUsage(
     command: SubcommandOption,
     args: string[],
-    interaction: CommandInteraction,
+    message: Message | null,
+    interaction: CommandInteraction | null,
   ): SubcommandUsage {
+    if (message) {
+      return {
+        args,
+        channel: message.channel as TextChannel,
+        client: command.instance.client as Client,
+        guild: message.guild,
+        instance: command.instance,
+        interaction: null,
+        member: message.member as GuildMember,
+        message,
+        text: args.join(" "),
+        user: message.author,
+      };
+    }
+
     return {
       args,
-      channel: interaction.channel as TextChannel,
-      client: command.instance.client,
-      guild: interaction.guild,
+      channel: interaction!.channel as TextChannel,
+      client: command.instance.client as Client,
+      guild: interaction!.guild,
       instance: command.instance,
-      interaction,
-      member: interaction.member as GuildMember,
+      interaction: interaction!,
+      member: interaction!.member as GuildMember,
+      message: null,
       text: args.join(" "),
-      user: interaction.user,
+      user: interaction!.user,
     };
   }
 }

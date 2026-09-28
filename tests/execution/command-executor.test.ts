@@ -23,6 +23,18 @@ const createInteraction = () => ({
   user: { id: "user-id" },
 });
 
+const createMessage = () => ({
+  author: { id: "user-id" },
+  channel: {
+    isSendable: vi.fn(() => true),
+    send: vi.fn().mockResolvedValue(undefined),
+    sendTyping: vi.fn().mockResolvedValue(undefined),
+  },
+  guild: { id: "guild-id" },
+  member: {},
+  reply: vi.fn().mockResolvedValue(undefined),
+});
+
 const createExecutor = () => {
   const reportError = vi.fn().mockResolvedValue(undefined);
   const handlePreconditionFailure = vi.fn().mockResolvedValue(undefined);
@@ -102,7 +114,12 @@ describe("central command execution", () => {
     });
     const command = createSubcommand(instance, callback, root, option);
 
-    await executor.executeSubcommand(command, ["user-id"], interaction as never);
+    await executor.executeSubcommand(
+      command,
+      ["user-id"],
+      null,
+      interaction as never,
+    );
 
     expect(order).toEqual(["root", "option", "callback"]);
     expect(interaction.reply).toHaveBeenCalledWith(response);
@@ -120,7 +137,7 @@ describe("central command execution", () => {
     const option = createContainer(instance, "Option", optionRun);
     const command = createSubcommand(instance, callback, root, option, true);
 
-    await executor.executeSubcommand(command, [], interaction as never);
+    await executor.executeSubcommand(command, [], null, interaction as never);
 
     expect(optionRun).not.toHaveBeenCalled();
     expect(interaction.deferReply).not.toHaveBeenCalled();
@@ -142,7 +159,7 @@ describe("central command execution", () => {
     }));
     const command = createSubcommand(instance, vi.fn(), emptyContainer(), option);
 
-    await executor.executeSubcommand(command, [], interaction as never);
+    await executor.executeSubcommand(command, [], null, interaction as never);
 
     expect(handlePreconditionFailure).toHaveBeenCalledWith(
       expect.objectContaining({ command, failure }),
@@ -158,7 +175,7 @@ describe("central command execution", () => {
     });
     const command = createSubcommand(instance, vi.fn(), emptyContainer(), option);
 
-    await executor.executeSubcommand(command, [], interaction as never);
+    await executor.executeSubcommand(command, [], null, interaction as never);
 
     expect(reportError).toHaveBeenCalledOnce();
     expect(reportError.mock.calls[0][0]).toBeInstanceOf(PreconditionExecutionError);
@@ -194,10 +211,125 @@ describe("central command execution", () => {
     await executor.executeSubcommand(
       command,
       [],
+      null,
       createInteraction() as never,
     );
 
     expect(commit).not.toHaveBeenCalled();
     expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("executes message subcommands with leaf response settings", async () => {
+    const response = { content: "Banned" };
+    const callback = vi.fn().mockResolvedValue(response);
+    const message = createMessage();
+    const { executor, instance } = createExecutor();
+    const option = new SubcommandOption(
+      instance,
+      "ban",
+      {
+        callback,
+        deferReply: true,
+        reply: false,
+      },
+      emptyContainer(),
+    );
+    new Subcommand(
+      instance,
+      "admin",
+      {
+        deferReply: false,
+        reply: true,
+        type: CommandType.BOTH,
+      },
+      [option],
+      emptyContainer(),
+    );
+
+    await executor.executeSubcommand(
+      option,
+      ["user-id", "spam"],
+      message as never,
+      null,
+    );
+
+    expect(callback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        args: ["user-id", "spam"],
+        interaction: null,
+        message,
+        text: "user-id spam",
+        user: message.author,
+      }),
+    );
+    expect(message.channel.sendTyping).toHaveBeenCalledOnce();
+    expect(message.channel.send).toHaveBeenCalledWith(response);
+    expect(message.reply).not.toHaveBeenCalled();
+  });
+
+  it("inherits message response settings from the subcommand root", async () => {
+    const callback = vi.fn().mockResolvedValue("Done");
+    const message = createMessage();
+    const { executor, instance } = createExecutor();
+    const option = new SubcommandOption(
+      instance,
+      "ban",
+      { callback },
+      emptyContainer(),
+    );
+    new Subcommand(
+      instance,
+      "admin",
+      {
+        deferReply: true,
+        reply: true,
+        type: CommandType.LEGACY,
+      },
+      [option],
+      emptyContainer(),
+    );
+
+    await executor.executeSubcommand(option, [], message as never, null);
+
+    expect(message.channel.sendTyping).toHaveBeenCalledOnce();
+    expect(message.reply).toHaveBeenCalledWith("Done");
+    expect(message.channel.send).not.toHaveBeenCalled();
+  });
+
+  it("ignores subcommand invocations outside the root command type", async () => {
+    const { executor, instance } = createExecutor();
+    const slashCallback = vi.fn();
+    const slash = createSubcommand(instance, slashCallback);
+
+    await executor.executeSubcommand(
+      slash,
+      [],
+      createMessage() as never,
+      null,
+    );
+
+    const legacyCallback = vi.fn();
+    const legacy = new SubcommandOption(
+      instance,
+      "ban",
+      { callback: legacyCallback },
+      emptyContainer(),
+    );
+    new Subcommand(
+      instance,
+      "admin",
+      { type: CommandType.LEGACY },
+      [legacy],
+      emptyContainer(),
+    );
+    await executor.executeSubcommand(
+      legacy,
+      [],
+      null,
+      createInteraction() as never,
+    );
+
+    expect(slashCallback).not.toHaveBeenCalled();
+    expect(legacyCallback).not.toHaveBeenCalled();
   });
 });

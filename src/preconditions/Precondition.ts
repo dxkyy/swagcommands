@@ -4,6 +4,7 @@ import type SWAG from "../../typings";
 import type {
   ChatInputSubcommandUsage,
   CommandUsage,
+  MessageSubcommandUsage,
 } from "../../typings";
 import type Command from "../command-handler/Command";
 import type SubcommandOption from "../subcommand-handler/SubcommandOption";
@@ -22,10 +23,12 @@ export type PreconditionContext = Readonly<Record<PropertyKey, unknown>>;
 
 export type PreconditionCommand = Command | Subcommand | SubcommandOption;
 
-export type MessageCommandUsage = CommandUsage & {
-  interaction?: null;
-  message: Message;
-};
+export type MessageCommandUsage =
+  | (CommandUsage & {
+      interaction?: null;
+      message: Message;
+    })
+  | MessageSubcommandUsage;
 
 export type ChatInputCommandUsage =
   | (CommandUsage & {

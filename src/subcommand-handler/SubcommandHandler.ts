@@ -1,4 +1,4 @@
-import { CommandInteraction } from "discord.js";
+import { CommandInteraction, Message } from "discord.js";
 import path from "path";
 
 import SWAG, {
@@ -344,9 +344,15 @@ class SubcommandHandler {
   public async runCommand(
     command: SubcommandOption,
     args: string[],
-    interaction: CommandInteraction,
+    message: Message | null,
+    interaction: CommandInteraction | null,
   ): Promise<void> {
-    await this._executor.executeSubcommand(command, args, interaction);
+    await this._executor.executeSubcommand(
+      command,
+      args,
+      message,
+      interaction,
+    );
   }
 
   private getValidations(folder?: string) {

@@ -51,6 +51,7 @@ export default async (
 	await subcommandHandler.runCommand(
 		subcommand,
 		args!,
+		null,
 		interaction
 	);
 };
