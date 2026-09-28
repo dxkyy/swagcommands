@@ -3,13 +3,13 @@ import { Client, MessageFlags } from "discord.js";
 import CommandHandler from "./command-handler/CommandHandler";
 import MessageCommandRouter from "./command-handler/MessageCommandRouter";
 import EventHandler from "./event-handler/EventHandler";
-import SWAG, {
+import type {
   CommandResponse,
   Events,
   Options,
   PreconditionFailureEvent,
   Validations,
-} from "../typings";
+} from "./types";
 import FeaturesHandler from "./util/FeaturesHandler";
 import { Logger } from "./logger/structures/Logger";
 import SubcommandHandler from "./subcommand-handler/SubcommandHandler";
@@ -74,9 +74,9 @@ class SWAGCommands {
     this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
     this._cooldownStore = options.cooldownStore ?? new MemoryCooldownStore();
     this._preconditions = new PreconditionStore();
-    registerBuiltInPreconditions(this as unknown as SWAG, this._preconditions);
+    registerBuiltInPreconditions(this, this._preconditions);
     this._responseHandler = new ResponseHandler(this);
-    this._commandExecutor = new CommandExecutor(this as unknown as SWAG);
+    this._commandExecutor = new CommandExecutor(this);
   }
 
   public static async create(options: Options): Promise<SWAGCommands> {
@@ -148,7 +148,7 @@ class SWAGCommands {
 
     if (preconditionsDir) {
       this._preconditionHandler = new PreconditionHandler(
-        this as unknown as SWAG,
+        this,
         preconditionsDir,
         this._preconditions,
       );
@@ -157,7 +157,7 @@ class SWAGCommands {
 
     if (commandsDir) {
       this._commandHandler = new CommandHandler(
-        this as unknown as SWAG,
+        this,
         commandsDir,
         client,
         this._commandExecutor,
@@ -167,7 +167,7 @@ class SWAGCommands {
 
     if (contextMenusDir) {
       this._contextMenuCommandHandler = new ContextMenuCommandHandler(
-        this as unknown as SWAG,
+        this,
         contextMenusDir,
         this._commandExecutor,
       );
@@ -176,7 +176,7 @@ class SWAGCommands {
 
     if (subcommandsDir) {
       this._subcommandHandler = new SubcommandHandler(
-        this as unknown as SWAG,
+        this,
         subcommandsDir,
         this._commandExecutor,
       );
@@ -185,7 +185,7 @@ class SWAGCommands {
 
     if (featuresDir) {
       const featuresHandler = new FeaturesHandler(
-        this as unknown as SWAG,
+        this,
         featuresDir,
         client,
       );
@@ -193,11 +193,11 @@ class SWAGCommands {
     }
 
     this._messageCommandRouter = new MessageCommandRouter(
-      this as unknown as SWAG,
+      this,
     );
 
     this._eventHandler = new EventHandler(
-      this as unknown as SWAG,
+      this,
       events as Events,
       client,
     );

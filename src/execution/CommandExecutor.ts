@@ -8,13 +8,14 @@ import {
   TextChannel,
 } from "discord.js";
 
-import SWAG, {
+import type SWAG from "../SWAG";
+import type {
   CommandUsage,
   ContextMenuCommandUsage,
   MessageContextMenuCommandUsage,
   SubcommandUsage,
   UserContextMenuCommandUsage,
-} from "../../typings";
+} from "../types";
 import Command from "../command-handler/Command";
 import ContextMenuCommand from "../context-menu-handler/ContextMenuCommand";
 import CommandType from "../util/CommandType";

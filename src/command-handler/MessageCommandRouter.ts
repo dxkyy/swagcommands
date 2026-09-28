@@ -3,7 +3,7 @@ import {
   Message,
 } from "discord.js";
 
-import SWAG from "../../typings";
+import type SWAG from "../SWAG";
 import { CommandDefinitionError } from "../errors/CommandDefinitionError";
 import Subcommand from "../subcommand-handler/Subcommand";
 import SubcommandHandler from "../subcommand-handler/SubcommandHandler";

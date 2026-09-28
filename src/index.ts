@@ -44,6 +44,22 @@ import {
   OwnerOnlyPrecondition,
   TestOnlyPrecondition,
 } from "./preconditions/built-ins/BuiltInPreconditions";
+import type { CooldownPreconditionContext } from "./cooldowns/CooldownPrecondition";
+
+export interface Preconditions {
+  ArgumentCount: {
+    expectedArgs?: string;
+    maxArgs?: number;
+    minArgs?: number;
+  };
+  GuildOnly: never;
+  HasPermissions: {
+    permissions: readonly bigint[];
+  };
+  OwnerOnly: never;
+  TestOnly: never;
+  Cooldown: CooldownPreconditionContext;
+}
 
 module.exports = SWAG;
 module.exports.CommandType = CommandType;

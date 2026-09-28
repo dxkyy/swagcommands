@@ -1,6 +1,6 @@
 import path from "path";
 
-import type SWAG from "../../typings";
+import type SWAG from "../SWAG";
 import getAllFiles from "../util/get-all-files";
 import { Precondition } from "./Precondition";
 import { PreconditionStore } from "./PreconditionStore";

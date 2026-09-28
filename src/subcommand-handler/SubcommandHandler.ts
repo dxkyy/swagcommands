@@ -6,11 +6,12 @@ import {
 } from "discord.js";
 import path from "path";
 
-import SWAG, {
+import type SWAG from "../SWAG";
+import type {
   DeferSetting,
   SubcommandObject,
   SubcommandOptionObject,
-} from "../../typings";
+} from "../types";
 import CommandExecutor from "../execution/CommandExecutor";
 import { CommandDefinitionError } from "../errors/CommandDefinitionError";
 import { compileCommandPreconditions } from "../preconditions/compile-command-preconditions";

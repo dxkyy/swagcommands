@@ -1,5 +1,5 @@
 import { Client } from "discord.js";
-import SWAG from "../../typings";
+import type SWAG from "../SWAG";
 import getAllFiles from "./get-all-files";
 
 class FeaturesHandler {

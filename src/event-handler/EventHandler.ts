@@ -2,7 +2,8 @@ import { Client, Interaction, InteractionType, Message } from "discord.js";
 import path from "path";
 
 import getAllFiles from "../util/get-all-files";
-import SWAG, { Events } from "../../typings";
+import type SWAG from "../SWAG";
+import type { Events } from "../types";
 import { EventExecutionError } from "../errors/EventExecutionError";
 import { Logger } from "../logger/structures/Logger";
 

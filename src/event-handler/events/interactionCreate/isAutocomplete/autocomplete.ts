@@ -1,6 +1,6 @@
 import { AutocompleteInteraction } from "discord.js";
 
-import SWAG from "../../../../../typings";
+import type SWAG from "../../../../SWAG";
 import AutocompleteHandler from "../../../../execution/AutocompleteHandler";
 
 export default async (interaction: AutocompleteInteraction, instance: SWAG) => {

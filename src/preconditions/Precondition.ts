@@ -1,12 +1,10 @@
-import type { CommandInteraction, Message } from "discord.js";
-
-import type SWAG from "../../typings";
+import type SWAG from "../SWAG";
 import type {
-  ChatInputSubcommandUsage,
-  CommandUsage,
+  ChatInputCommandUsage,
   ContextMenuCommandUsage,
-  MessageSubcommandUsage,
-} from "../../typings";
+  MessageCommandUsage,
+  PreconditionFactoryEntry,
+} from "../types";
 import type ContextMenuCommand from "../context-menu-handler/ContextMenuCommand";
 import type SubcommandOption from "../subcommand-handler/SubcommandOption";
 import type Subcommand from "../subcommand-handler/Subcommand";
@@ -17,7 +15,6 @@ import {
   PreconditionFailureOptions,
   PreconditionResult,
 } from "./PreconditionResult";
-import type { PreconditionSingleResolvableDetails } from "./containers/PreconditionContainer";
 
 export type Awaitable<T> = T | Promise<T>;
 
@@ -29,21 +26,11 @@ export type PreconditionCommand =
   | Subcommand
   | SubcommandOption;
 
-export type MessageCommandUsage =
-  | (CommandUsage & {
-      interaction?: null;
-      message: Message;
-    })
-  | MessageSubcommandUsage;
-
-export type ChatInputCommandUsage =
-  | (CommandUsage & {
-      interaction: CommandInteraction;
-      message?: null;
-    })
-  | ChatInputSubcommandUsage;
-
-export type { ContextMenuCommandUsage } from "../../typings";
+export type {
+  ChatInputCommandUsage,
+  ContextMenuCommandUsage,
+  MessageCommandUsage,
+} from "../types";
 
 export class Precondition {
   public readonly instance: SWAG;
@@ -125,12 +112,12 @@ export interface NamedPreconditionClass {
 
 export function createPreconditionFactory<Context extends PreconditionContext>(
   precondition: string | NamedPreconditionClass,
-): (context: Context) => PreconditionSingleResolvableDetails {
+): (context: Context) => PreconditionFactoryEntry<Context> {
   const name = typeof precondition === "string"
     ? precondition
     : precondition.preconditionName;
 
-  return (context) => ({ name, context });
+  return (context) => ({ name, context }) as PreconditionFactoryEntry<Context>;
 }
 
 export function preconditionOk(): PreconditionResult {

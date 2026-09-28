@@ -1,4 +1,5 @@
-import SWAG, { SubcommandObject } from "../../typings";
+import type SWAG from "../SWAG";
+import type { SubcommandObject } from "../types";
 import SubcommandOption from "./SubcommandOption";
 import { PreconditionContainerArray } from "../preconditions/containers/PreconditionContainerArray";
 

@@ -1,4 +1,4 @@
-import type { PreconditionArrayResolvable } from "../../typings";
+import type { PreconditionArrayResolvable } from "../types";
 
 interface GuardedCommandDefinition {
   expectedArgs?: string;

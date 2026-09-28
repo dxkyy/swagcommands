@@ -12,7 +12,7 @@ import {
   createPreconditionFactory,
 } from "../Precondition";
 import type { PreconditionStore } from "../PreconditionStore";
-import type SWAG from "../../../typings";
+import type SWAG from "../../SWAG";
 import { CooldownPrecondition } from "../../cooldowns/CooldownPrecondition";
 
 type Usage =

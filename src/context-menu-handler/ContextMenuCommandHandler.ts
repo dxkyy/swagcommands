@@ -4,10 +4,11 @@ import {
 } from "discord.js";
 import path from "path";
 
-import SWAG, {
+import type SWAG from "../SWAG";
+import type {
   ContextMenuCommandObject,
   DeferSetting,
-} from "../../typings";
+} from "../types";
 import { CommandDefinitionError } from "../errors/CommandDefinitionError";
 import CommandExecutor from "../execution/CommandExecutor";
 import { compileCommandPreconditions } from "../preconditions/compile-command-preconditions";
