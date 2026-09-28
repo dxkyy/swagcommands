@@ -20,7 +20,7 @@ import type {
   ContextMenuCommandObject,
   SubcommandObject,
   SubcommandOptionObject,
-} from "../../src/types";
+} from "../../src/index";
 
 const instance = {} as SWAG;
 const preconditions = () =>

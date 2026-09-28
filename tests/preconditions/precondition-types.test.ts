@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import type {
   PreconditionArrayResolvable,
   PreconditionFactoryEntry,
-} from "../../typings";
+} from "../../src/index";
 
-declare module "../../typings" {
+declare module "../../src/index" {
   interface Preconditions {
     MinimumLevel: {
       level: number;

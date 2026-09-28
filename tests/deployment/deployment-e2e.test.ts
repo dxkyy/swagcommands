@@ -30,7 +30,7 @@ vi.mock("../../src/event-handler/EventHandler", () => ({
 
 import SWAG from "../../src/SWAG";
 import CommandType from "../../src/util/CommandType";
-import { CommandObject } from "../../typings";
+import type { CommandObject } from "../../src/index";
 
 const createClient = (set: ReturnType<typeof vi.fn>) =>
   ({

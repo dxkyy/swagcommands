@@ -911,4 +911,4 @@ export class Subcommand {
   public get preconditions(): PreconditionContainerArray;
 }
 
-export { CommandObject, Command, CommandType };
+export { CommandObject, Command, CommandType, SWAG as SWAGCommands };
