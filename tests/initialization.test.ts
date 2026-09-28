@@ -12,6 +12,8 @@ const lifecycle = vi.hoisted(() => ({
 
 vi.mock("../src/command-handler/CommandHandler", () => ({
   default: class CommandHandler {
+    commands = new Map();
+
     async load() {
       await lifecycle.commandLoad();
     }
@@ -20,6 +22,8 @@ vi.mock("../src/command-handler/CommandHandler", () => ({
 
 vi.mock("../src/subcommand-handler/SubcommandHandler", () => ({
   default: class SubcommandHandler {
+    legacyCommands = new Map();
+
     async load() {
       await lifecycle.subcommandLoad();
     }

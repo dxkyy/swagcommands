@@ -346,12 +346,17 @@ class SubcommandHandler {
     args: string[],
     message: Message | null,
     interaction: CommandInteraction | null,
+    selection: {
+      subcommandGroup?: string;
+      subcommandName?: string;
+    } = {},
   ): Promise<void> {
     await this._executor.executeSubcommand(
       command,
       args,
       message,
       interaction,
+      selection,
     );
   }
 

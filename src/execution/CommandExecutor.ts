@@ -135,6 +135,10 @@ class CommandExecutor {
     args: string[],
     message: Message | null,
     interaction: CommandInteraction | null,
+    selection: {
+      subcommandGroup?: string;
+      subcommandName?: string;
+    } = {},
   ): Promise<void> {
     if ((!message && !interaction) || (message && interaction)) {
       return;
@@ -168,6 +172,7 @@ class CommandExecutor {
       args,
       message,
       interaction,
+      selection,
     );
 
     try {
@@ -404,7 +409,16 @@ class CommandExecutor {
     args: string[],
     message: Message | null,
     interaction: CommandInteraction | null,
+    selection: {
+      subcommandGroup?: string;
+      subcommandName?: string;
+    },
   ): SubcommandUsage {
+    const identity = {
+      commandName: command.parent.commandName,
+      subcommandGroup: selection.subcommandGroup,
+      subcommandName: selection.subcommandName ?? command.commandName,
+    };
     if (message) {
       return {
         args,
@@ -415,6 +429,7 @@ class CommandExecutor {
         interaction: null,
         member: message.member as GuildMember,
         message,
+        ...identity,
         text: args.join(" "),
         user: message.author,
       };
@@ -429,6 +444,7 @@ class CommandExecutor {
       interaction: interaction!,
       member: interaction!.member as GuildMember,
       message: null,
+      ...identity,
       text: args.join(" "),
       user: interaction!.user,
     };

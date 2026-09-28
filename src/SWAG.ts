@@ -1,6 +1,7 @@
 import { Client, MessageFlags } from "discord.js";
 
 import CommandHandler from "./command-handler/CommandHandler";
+import MessageCommandRouter from "./command-handler/MessageCommandRouter";
 import EventHandler from "./event-handler/EventHandler";
 import SWAG, {
   CommandResponse,
@@ -58,6 +59,7 @@ class SWAGCommands {
   private readonly _options: Options;
   private readonly _commandExecutor: CommandExecutor;
   private readonly _responseHandler: ResponseHandler;
+  private _messageCommandRouter!: MessageCommandRouter;
 
   private constructor(options: Options) {
     this._options = {
@@ -178,6 +180,10 @@ class SWAGCommands {
       await featuresHandler.load();
     }
 
+    this._messageCommandRouter = new MessageCommandRouter(
+      this as unknown as SWAG,
+    );
+
     this._eventHandler = new EventHandler(
       this as unknown as SWAG,
       events as Events,
@@ -258,6 +264,10 @@ class SWAGCommands {
 
   public get responseHandler(): ResponseHandler {
     return this._responseHandler;
+  }
+
+  public get messageCommandRouter(): MessageCommandRouter {
+    return this._messageCommandRouter;
   }
 
   public async deployCommands(

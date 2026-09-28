@@ -284,6 +284,7 @@ export default class SWAG {
   public get preconditions(): PreconditionStore;
   public get state(): LifecycleState;
   public get responseHandler(): ResponseHandler;
+  public get messageCommandRouter(): MessageCommandRouter;
   public isReady(): boolean;
   public deployCommands(
     options?: DeployCommandsOptions,
@@ -366,6 +367,9 @@ export interface SubcommandUsageBase {
   member?: GuildMember;
   user: User;
   channel?: TextChannel;
+  commandName: string;
+  subcommandGroup?: string;
+  subcommandName: string;
 }
 
 export type MessageSubcommandUsage = SubcommandUsageBase & {
@@ -684,6 +688,11 @@ export interface MessageCommandCapabilities {
 export interface InteractionCommandCapabilities {
   description?: string;
   deferReply?: DeferSetting;
+}
+
+export class MessageCommandRouter {
+  public constructor(instance: SWAG);
+  public execute(message: Message): Promise<void>;
 }
 
 export interface CommandObject
