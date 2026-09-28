@@ -33,6 +33,8 @@ await swag.startFeatures();
 
 `SWAG.create()` resolves after command, subcommand, context-menu, and event files load, feature discovery completes, `BeforeCommands` and `AfterCommands` one-time features finish, and event listeners are registered. `ClientReady` one-time features run through `startFeatures()`, which waits for the Discord client to become ready and can be called more than once without rerunning them. A plain function feature defaults to `ClientReady`. If local initialization fails, `SWAG.create()` rejects with an `InitializationError`; a partially initialized instance is not returned.
 
+Feature objects with `everyMs` run repeatedly at their selected phase. Set `runOnStart: true` to run immediately; otherwise the first run begins after one interval. Each run finishes before the next interval begins. A failed run is reported through `onError` and does not stop later runs. Call `await swag.stopFeatures()` during shutdown to clear feature timers, signal running jobs, and run cleanup functions returned by one-time features. If initialization or client-ready feature startup fails, SWAGCommands performs this cleanup before rejecting.
+
 The instance exposes `state` and `isReady()` for lifecycle inspection:
 
 ```ts

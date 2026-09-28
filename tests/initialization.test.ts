@@ -10,6 +10,7 @@ const lifecycle = vi.hoisted(() => ({
   featureLoad: vi.fn<() => Promise<void>>(),
   featureHasPhase: vi.fn<(_phase: string) => boolean>(),
   featureRunPhase: vi.fn<(_phase: string) => Promise<void>>(),
+  featureStop: vi.fn<() => Promise<void>>(),
   preconditionLoad: vi.fn<() => Promise<void>>(),
   subcommandLoad: vi.fn<() => Promise<void>>(),
 }));
@@ -46,6 +47,12 @@ vi.mock("../src/subcommand-handler/SubcommandHandler", () => ({
 
 vi.mock("../src/util/FeaturesHandler", () => ({
   default: class FeaturesHandler {
+    private readonly controller = new AbortController();
+
+    get signal() {
+      return this.controller.signal;
+    }
+
     async load() {
       await lifecycle.featureLoad();
     }
@@ -56,6 +63,11 @@ vi.mock("../src/util/FeaturesHandler", () => ({
 
     hasPhase(phase: string) {
       return lifecycle.featureHasPhase(phase);
+    }
+
+    async stop() {
+      this.controller.abort();
+      await lifecycle.featureStop();
     }
   },
 }));
@@ -112,6 +124,7 @@ describe("SWAG initialization", () => {
     lifecycle.featureLoad.mockResolvedValue(undefined);
     lifecycle.featureHasPhase.mockReturnValue(true);
     lifecycle.featureRunPhase.mockResolvedValue(undefined);
+    lifecycle.featureStop.mockResolvedValue(undefined);
     lifecycle.preconditionLoad.mockResolvedValue(undefined);
     lifecycle.subcommandLoad.mockResolvedValue(undefined);
   });
@@ -347,6 +360,25 @@ describe("SWAG initialization", () => {
     expect(lifecycle.featureRunPhase.mock.calls.filter(([phase]) =>
       phase === FeaturePhase.ClientReady,
     )).toHaveLength(1);
+    expect(lifecycle.featureStop).toHaveBeenCalledOnce();
+  });
+
+  it("stops features and removes the ready listener during a pending start", async () => {
+    const client = Object.assign(new EventEmitter(), createClient(), {
+      isReady: vi.fn(() => false),
+    });
+    const instance = await createSWAG({ client, featuresDir: "/features" });
+    const starting = instance.startFeatures();
+    expect(client.listenerCount(DiscordEvents.ClientReady)).toBe(1);
+
+    const firstStop = instance.stopFeatures();
+    const secondStop = instance.stopFeatures();
+    expect(firstStop).toBe(secondStop);
+    await firstStop;
+    await expect(starting).rejects.toThrow("Features have been stopped.");
+    await expect(instance.startFeatures()).rejects.toThrow("Features have been stopped.");
+    expect(client.listenerCount(DiscordEvents.ClientReady)).toBe(0);
+    expect(lifecycle.featureStop).toHaveBeenCalledOnce();
   });
 
   it("does not wait for client readiness without client-ready features", async () => {
@@ -411,6 +443,19 @@ describe("SWAG initialization", () => {
       phase: "initialization",
     } satisfies Partial<InitializationError>);
 
+    expect(lifecycle.eventRegister).not.toHaveBeenCalled();
+  });
+
+  it("rolls back features when command loading fails", async () => {
+    lifecycle.commandLoad.mockRejectedValue(new Error("command loading failed"));
+
+    await expect(createSWAG({
+      client: createClient(),
+      commandsDir: "/commands",
+      featuresDir: "/features",
+    })).rejects.toThrow("command loading failed");
+
+    expect(lifecycle.featureStop).toHaveBeenCalledOnce();
     expect(lifecycle.eventRegister).not.toHaveBeenCalled();
   });
 

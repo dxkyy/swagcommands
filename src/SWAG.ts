@@ -62,6 +62,8 @@ class SWAGCommands {
   private _state: LifecycleState = "idle";
   private _initialization: Promise<void> | undefined;
   private _featuresStart: Promise<void> | undefined;
+  private _featuresStartFailed = false;
+  private _featuresStop: Promise<void> | undefined;
   private readonly _options: Options;
   private readonly _commandExecutor: CommandExecutor;
   private readonly _responseHandler: ResponseHandler;
@@ -106,6 +108,7 @@ class SWAGCommands {
       this._state = "ready";
     } catch (error) {
       this._state = "failed";
+      await this.rollbackFeatures();
       if (error instanceof InitializationError) {
         throw error;
       }
@@ -286,8 +289,27 @@ class SWAGCommands {
   }
 
   public startFeatures(): Promise<void> {
+    if (this._featuresStartFailed) {
+      return this._featuresStart!;
+    }
+    if (this._featuresStop) {
+      return Promise.reject(new Error("Features have already been stopped."));
+    }
     this._featuresStart ??= this.performStartFeatures();
     return this._featuresStart;
+  }
+
+  public stopFeatures(): Promise<void> {
+    this._featuresStop ??= this._featuresHandler?.stop() ?? Promise.resolve();
+    return this._featuresStop;
+  }
+
+  private async rollbackFeatures(): Promise<void> {
+    try {
+      await this.stopFeatures();
+    } catch (cleanupError) {
+      logger.error("Failed to clean up features after startup failed.", cleanupError);
+    }
   }
 
   private async performStartFeatures(): Promise<void> {
@@ -298,22 +320,43 @@ class SWAGCommands {
       return;
     }
 
-    await this.waitForClientReady();
-    await this._featuresHandler.runPhase(FeaturePhase.ClientReady);
+    try {
+      await this.waitForClientReady();
+      await this._featuresHandler.runPhase(FeaturePhase.ClientReady);
+    } catch (error) {
+      this._featuresStartFailed = true;
+      await this.rollbackFeatures();
+      throw error;
+    }
   }
 
   private async waitForClientReady(): Promise<void> {
+    const signal = this._featuresHandler?.signal;
+    if (signal?.aborted) {
+      throw new Error("Features have been stopped.");
+    }
     if (this._client.isReady()) {
       return;
     }
 
-    await new Promise<void>((resolve) => {
-      const onReady = () => {
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
         this._client.off(DiscordEvents.ClientReady, onReady);
+        signal?.removeEventListener("abort", onAbort);
+      };
+      const onReady = () => {
+        cleanup();
         resolve();
       };
+      const onAbort = () => {
+        cleanup();
+        reject(new Error("Features have been stopped."));
+      };
       this._client.once(DiscordEvents.ClientReady, onReady);
-      if (this._client.isReady()) {
+      signal?.addEventListener("abort", onAbort, { once: true });
+      if (signal?.aborted) {
+        onAbort();
+      } else if (this._client.isReady()) {
         onReady();
       }
     });
