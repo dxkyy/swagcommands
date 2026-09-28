@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type {
   MessageContextMenuCommandObject,
   UserContextMenuCommandObject,
-} from "../typings";
+} from "../src/index";
 
 const userCommand: UserContextMenuCommandObject = {
   callback: (usage) => {

@@ -19,6 +19,21 @@ const swag = await SWAG.create({
 
 Loading is local. After the Discord client is ready, call `deployCommands()` to synchronize slash commands, slash subcommand roots, and context-menu commands.
 
+## List loaded commands
+
+After `SWAG.create()` resolves, `swag.listCommands()` returns metadata for every loaded normal command, subcommand root, and context-menu command. Subcommand leaves appear in their root's `subcommands` array. Normal command aliases do not create duplicate entries, while user and message context menus with the same name remain distinct by `type`.
+
+```ts
+for (const command of swag.listCommands()) {
+  console.log(command.name, command.kind, command.type);
+  if (command.kind === "subcommand") {
+    console.log(command.subcommands.map((leaf) => leaf.name));
+  }
+}
+```
+
+Entries are sorted by name. The returned objects and alias arrays are copies, so changing them does not change registered commands. `description` is available for normal commands, subcommand roots, and leaves when defined; context menus have no description.
+
 ## Normal commands
 
 A file in `commandsDir` exports one command object. The filename is its command name.
@@ -26,8 +41,9 @@ A file in `commandsDir` exports one command object. The filename is its command 
 ```ts
 // commands/ping.ts
 import { CommandType } from "swagcommands";
+import type { CommandObject } from "swagcommands";
 
-export default {
+const command = {
   type: CommandType.BOTH,
   description: "Check whether the bot is responsive",
   aliases: ["p"],
@@ -35,7 +51,9 @@ export default {
   callback: async ({ interaction, message }) => {
     return interaction ? "Slash pong" : `Pong for ${message.author}`;
   },
-};
+} satisfies CommandObject;
+
+export default command;
 ```
 
 `CommandType` controls the available invocation paths:
@@ -65,14 +83,17 @@ The root looks like a normal command definition but does not have a callback:
 ```ts
 // subcommands/admin/index.ts
 import { CommandType } from "swagcommands";
+import type { SubcommandObject } from "swagcommands";
 
-export default {
+const command = {
   type: CommandType.BOTH,
   description: "Administration commands",
   aliases: ["mod"],
   guildOnly: true,
   deferReply: false,
-};
+} satisfies SubcommandObject;
+
+export default command;
 ```
 
 Every leaf is its own command object. This means `/admin ban` can have preconditions, initialization, argument metadata, `deferReply`, `reply`, aliases, and a callback that are independent from `/admin status`:
@@ -83,8 +104,9 @@ import {
   ApplicationCommandOptionType,
   PermissionFlagsBits,
 } from "discord.js";
+import type { SubcommandOptionObject } from "swagcommands";
 
-export default {
+const command = {
   description: "Ban a member",
   aliases: ["b"],
   permissions: [PermissionFlagsBits.BanMembers],
@@ -101,7 +123,9 @@ export default {
     await banMember(args[0]);
     return `${commandName}/${subcommandName} completed`;
   },
-};
+} satisfies SubcommandOptionObject;
+
+export default command;
 ```
 
 Root preconditions run before leaf preconditions. Leaf response settings override root settings; omitted leaf settings inherit from the root.

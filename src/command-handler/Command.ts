@@ -1,4 +1,5 @@
-import SWAG, { CommandObject } from "../../typings";
+import type SWAG from "../SWAG";
+import type { CommandObject } from "../types";
 import { PreconditionContainerArray } from "../preconditions/containers/PreconditionContainerArray";
 
 class Command {

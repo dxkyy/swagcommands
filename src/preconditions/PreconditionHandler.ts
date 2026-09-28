@@ -1,6 +1,6 @@
 import path from "path";
 
-import type SWAG from "../../typings";
+import type SWAG from "../SWAG";
 import getAllFiles from "../util/get-all-files";
 import { Precondition } from "./Precondition";
 import { PreconditionStore } from "./PreconditionStore";
@@ -16,7 +16,7 @@ type NamedPreconditionConstructor = PreconditionConstructor & {
 
 function isPreconditionConstructor(
   value: unknown,
-): value is PreconditionConstructor {
+): value is NamedPreconditionConstructor {
   return (
     typeof value === "function" &&
     (value === Precondition || value.prototype instanceof Precondition)
@@ -39,7 +39,7 @@ export class PreconditionHandler {
 
   private async readFiles(): Promise<void> {
     for (const file of getAllFiles(this.preconditionsDir)) {
-      const PreconditionClass = file.fileContents as NamedPreconditionConstructor;
+      const PreconditionClass = file.fileContents;
       if (!isPreconditionConstructor(PreconditionClass)) {
         throw new TypeError(
           `Precondition file "${file.filePath}" must default-export a class extending Precondition.`,

@@ -4,10 +4,11 @@ import {
 } from "discord.js";
 import path from "path";
 
-import SWAG, {
+import type SWAG from "../SWAG";
+import type {
   ContextMenuCommandObject,
   DeferSetting,
-} from "../../typings";
+} from "../types";
 import { CommandDefinitionError } from "../errors/CommandDefinitionError";
 import CommandExecutor from "../execution/CommandExecutor";
 import { compileCommandPreconditions } from "../preconditions/compile-command-preconditions";
@@ -130,11 +131,16 @@ class ContextMenuCommandHandler {
     }
   }
 
-  private getValidations(folder?: string) {
+  private getValidations(folder?: string): Array<(command: ContextMenuCommand) => void> {
     if (!folder) {
       return [];
     }
-    return getAllFiles(folder).map((fileData) => fileData.fileContents);
+    return getAllFiles(folder).map(({ fileContents, filePath }) => {
+      if (typeof fileContents !== "function") {
+        throw new TypeError(`Validation file "${filePath}" must export a function.`);
+      }
+      return fileContents as (command: ContextMenuCommand) => void;
+    });
   }
 
   private definitionError(

@@ -146,6 +146,7 @@ SWAGCommands filters those strings against the focused value, limits the result 
 
 ## V1 migration checklist
 
+- Update imports for the v2 CommonJS export shape and use generated declarations from the package entry point. See [V2 generated types and import migration](v2-types-and-imports.md).
 - Replace `new SWAG(options)` with `await SWAG.create(options)`.
 - Catch rejected initialization or let it fail application startup explicitly.
 - Provide `botOwners` when any command or subcommand uses the `OwnerOnly` precondition.

@@ -1,19 +1,11 @@
 import { AutocompleteInteraction } from "discord.js";
 
-import Command from "../command-handler/Command";
 import CommandHandler from "../command-handler/CommandHandler";
 import { AutocompleteError } from "../errors/AutocompleteError";
 import { ErrorContext } from "../errors/SwagError";
-import Subcommand from "../subcommand-handler/Subcommand";
 import SubcommandHandler from "../subcommand-handler/SubcommandHandler";
+import type { Awaitable } from "../types";
 import { ErrorReporter } from "./ResponseHandler";
-
-type AutocompleteCommand = Command | Subcommand;
-type AutocompleteCallback = (
-  command: AutocompleteCommand,
-  focusedOption: string,
-  interaction: AutocompleteInteraction,
-) => unknown | Promise<unknown>;
 
 class AutocompleteHandler {
   private readonly _reporter: ErrorReporter;
@@ -36,15 +28,11 @@ class AutocompleteHandler {
       return;
     }
 
-    const { callback, command, context } = resolved;
+    const { callback, context } = resolved;
 
     try {
       const focusedOption = interaction.options.getFocused(true);
-      const choices = await callback(
-        command,
-        focusedOption.name,
-        interaction,
-      );
+      const choices = await callback(focusedOption.name, interaction);
 
       if (!Array.isArray(choices)) {
         throw new TypeError("Autocomplete callbacks must return an array.");
@@ -85,16 +73,19 @@ class AutocompleteHandler {
     subcommandHandler?: SubcommandHandler,
   ):
     | {
-        callback: AutocompleteCallback;
-        command: AutocompleteCommand;
+        callback: (
+          focusedOption: string,
+          interaction: AutocompleteInteraction,
+        ) => Awaitable<readonly string[]>;
         context: ErrorContext;
       }
     | undefined {
     const command = commandHandler?.commands.get(interaction.commandName);
-    if (command?.commandObject.autocomplete) {
+    const commandAutocomplete = command?.commandObject.autocomplete;
+    if (command && commandAutocomplete) {
       return {
-        callback: command.commandObject.autocomplete as AutocompleteCallback,
-        command,
+        callback: (focusedOption, interaction) =>
+          commandAutocomplete(command, focusedOption, interaction),
         context: {
           commandName: interaction.commandName,
           invocationKind: "autocomplete",
@@ -111,13 +102,14 @@ class AutocompleteHandler {
     const option = subcommand.options.find(
       (candidate) => candidate.commandName === subcommandName,
     );
-    if (!option?.optionObject.autocomplete) {
+    const optionAutocomplete = option?.optionObject.autocomplete;
+    if (!option || !optionAutocomplete) {
       return;
     }
 
     return {
-      callback: option.optionObject.autocomplete as AutocompleteCallback,
-      command: subcommand,
+      callback: (focusedOption, interaction) =>
+        optionAutocomplete(subcommand, focusedOption, interaction),
       context: {
         commandName: interaction.commandName,
         invocationKind: "autocomplete",

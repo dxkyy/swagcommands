@@ -14,12 +14,13 @@ import { PreconditionStore } from "../../src/preconditions/PreconditionStore";
 import Subcommand from "../../src/subcommand-handler/Subcommand";
 import SubcommandOption from "../../src/subcommand-handler/SubcommandOption";
 import CommandType from "../../src/util/CommandType";
-import SWAG, {
+import type SWAG from "../../src/SWAG";
+import type {
   CommandObject,
   ContextMenuCommandObject,
   SubcommandObject,
   SubcommandOptionObject,
-} from "../../typings";
+} from "../../src/index";
 
 const instance = {} as SWAG;
 const preconditions = () =>

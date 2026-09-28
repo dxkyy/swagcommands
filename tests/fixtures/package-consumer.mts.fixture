@@ -1,0 +1,15 @@
+import swagcommands from "swagcommands";
+import type { CommandObject } from "swagcommands";
+
+const SWAG = swagcommands.default;
+const constructor: typeof swagcommands.SWAGCommands = SWAG;
+
+const command: CommandObject = {
+  type: swagcommands.CommandType.SLASH,
+  callback: ({ interaction }) => interaction.commandName,
+};
+
+// @ts-expect-error Deep imports are excluded from the package export map.
+import type { SubcommandObject } from "swagcommands/dist/types";
+
+void [constructor, command];

@@ -1,7 +1,7 @@
 import type {
   CommandObject,
   PreconditionArrayResolvable as DeclaredPreconditionArrayResolvable,
-} from "../../typings";
+} from "../types";
 import type CommandType from "../util/CommandType";
 import { CommandDefinitionError } from "../errors/CommandDefinitionError";
 import {

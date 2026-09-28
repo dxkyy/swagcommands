@@ -1,4 +1,5 @@
-import SWAG, { ContextMenuCommandObject } from "../../typings";
+import type SWAG from "../SWAG";
+import type { ContextMenuCommandObject } from "../types";
 import { PreconditionContainerArray } from "../preconditions/containers/PreconditionContainerArray";
 
 class ContextMenuCommand {

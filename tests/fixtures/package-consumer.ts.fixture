@@ -1,0 +1,69 @@
+import SWAG, { CommandType, MemoryPrefixStore, SWAGCommands } from "swagcommands";
+import type {
+  CommandObject,
+  ContextMenuCommandObject,
+  ListedCommandEntry,
+  PreconditionArrayResolvable,
+  SubcommandObject,
+  SubcommandOptionObject,
+} from "swagcommands";
+import { ApplicationCommandType } from "discord.js";
+
+// @ts-expect-error Internal declaration paths are outside the public export map.
+import type { CommandObject as InternalCommandObject } from "swagcommands/dist/types";
+
+declare module "swagcommands" {
+  interface Preconditions {
+    MinimumLevel: { level: number };
+  }
+}
+
+const legacy = {
+  type: CommandType.LEGACY,
+  callback: ({ message }) => message.author.username,
+} satisfies CommandObject;
+
+const slash = {
+  type: CommandType.SLASH,
+  callback: ({ interaction }) => interaction.commandName,
+  autocomplete: (_command, focusedOption) => [focusedOption],
+} satisfies CommandObject;
+
+const both = {
+  type: CommandType.BOTH,
+  callback: ({ message, interaction }) =>
+    message ? message.author.username : interaction.commandName,
+} satisfies CommandObject;
+
+const root = {
+  type: CommandType.BOTH,
+} satisfies SubcommandObject;
+
+const leaf = {
+  callback: ({ interaction, message }) =>
+    interaction ? interaction.commandName : message.content,
+} satisfies SubcommandOptionObject;
+
+const contextMenu = {
+  type: ApplicationCommandType.User,
+  callback: ({ targetUser }) => targetUser.username,
+} satisfies ContextMenuCommandObject;
+
+const preconditions: PreconditionArrayResolvable = [
+  { name: "MinimumLevel", context: { level: 3 } },
+];
+
+// @ts-expect-error A required precondition context cannot use string shorthand.
+const missingContext: PreconditionArrayResolvable = ["MinimumLevel"];
+
+const invalidAutocomplete: CommandObject = {
+  type: CommandType.SLASH,
+  callback: () => undefined,
+  // @ts-expect-error Autocomplete results must contain strings.
+  autocomplete: () => [42],
+};
+
+const constructor: typeof SWAGCommands = SWAG;
+const listCommands: () => ListedCommandEntry[] = SWAG.prototype.listCommands;
+const prefixStore = new MemoryPrefixStore();
+void [legacy, slash, both, root, leaf, contextMenu, preconditions, missingContext, invalidAutocomplete, constructor, listCommands, prefixStore];

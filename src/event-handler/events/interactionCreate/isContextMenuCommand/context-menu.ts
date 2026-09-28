@@ -1,6 +1,6 @@
 import { ContextMenuCommandInteraction } from "discord.js";
 
-import SWAG from "../../../../../typings";
+import type SWAG from "../../../../SWAG";
 
 export default async (
   interaction: ContextMenuCommandInteraction,

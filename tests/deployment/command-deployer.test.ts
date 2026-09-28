@@ -9,7 +9,7 @@ import {
 import { PreconditionContainerArray } from "../../src/preconditions/containers/PreconditionContainerArray";
 import { PreconditionStore } from "../../src/preconditions/PreconditionStore";
 import CommandType from "../../src/util/CommandType";
-import SWAG from "../../typings";
+import type SWAG from "../../src/SWAG";
 
 const instance = {} as SWAG;
 

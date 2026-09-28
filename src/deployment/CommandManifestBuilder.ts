@@ -13,7 +13,7 @@ import { CommandDefinitionError } from "../errors/CommandDefinitionError";
 import Subcommand from "../subcommand-handler/Subcommand";
 import SubcommandOption from "../subcommand-handler/SubcommandOption";
 import CommandType from "../util/CommandType";
-import { CommandObject } from "../../typings";
+import { CommandObject } from "../types";
 import ContextMenuCommand from "../context-menu-handler/ContextMenuCommand";
 
 export interface CommandManifestSources {
