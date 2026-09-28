@@ -23,6 +23,8 @@ import CommandHandler from "../src/command-handler/CommandHandler";
 import CommandExecutor from "../src/execution/CommandExecutor";
 import EventHandler from "../src/event-handler/EventHandler";
 import FeaturesHandler from "../src/util/FeaturesHandler";
+import { FeaturePhase } from "../src/features/FeaturePhase";
+import { FeatureExecutionError } from "../src/errors/FeatureExecutionError";
 import SubcommandHandler from "../src/subcommand-handler/SubcommandHandler";
 import { CommandDefinitionError } from "../src/errors/CommandDefinitionError";
 import { Precondition } from "../src/preconditions/Precondition";
@@ -116,7 +118,7 @@ describe("explicit handler loading", () => {
     expect(init).toHaveBeenCalledOnce();
   });
 
-  it("awaits feature initialization and only loads once", async () => {
+  it("discovers features once and awaits each one-time phase once", async () => {
     let finishFeature!: () => void;
     const feature = vi.fn(
       () =>
@@ -126,7 +128,10 @@ describe("explicit handler loading", () => {
     );
     loading.files.set("/features", [
       {
-        fileContents: feature,
+        fileContents: {
+          phase: FeaturePhase.AfterCommands,
+          run: feature,
+        },
         filePath: "/features/feature.ts",
       },
     ]);
@@ -144,15 +149,56 @@ describe("explicit handler loading", () => {
     const secondLoad = handler.load();
 
     expect(firstLoad).toBe(secondLoad);
+    await firstLoad;
+    expect(feature).not.toHaveBeenCalled();
+
+    const firstRun = handler.runPhase(FeaturePhase.AfterCommands);
+    const secondRun = handler.runPhase(FeaturePhase.AfterCommands);
+    expect(firstRun).toBe(secondRun);
     await vi.waitFor(() => {
       expect(feature).toHaveBeenCalledOnce();
     });
 
     finishFeature();
-    await firstLoad;
+    await firstRun;
     await handler.load();
+    await handler.runPhase(FeaturePhase.AfterCommands);
 
     expect(feature).toHaveBeenCalledOnce();
+    expect(loading.getAllFiles).toHaveBeenCalledOnce();
+    expect(feature).toHaveBeenCalledWith({
+      client: expect.any(Object),
+      instance: expect.any(Object),
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it("reports one-time feature failures with their name and path", async () => {
+    const failure = new Error("feature failed");
+    loading.files.set("/features", [
+      {
+        fileContents: {
+          name: "setup",
+          phase: FeaturePhase.BeforeCommands,
+          run: () => { throw failure; },
+        },
+        filePath: "/features/setup.ts",
+      },
+    ]);
+    const handler = new FeaturesHandler(
+      createInstance() as never,
+      "/features",
+      {} as never,
+    );
+
+    await expect(handler.runPhase(FeaturePhase.BeforeCommands)).rejects.toMatchObject({
+      cause: failure,
+      code: "SWAG_FEATURE_EXECUTION_FAILED",
+      context: {
+        featureName: "setup",
+        filePath: "/features/setup.ts",
+      },
+    } satisfies Partial<FeatureExecutionError>);
   });
 
   it("does not deploy slash commands while loading command definitions", async () => {

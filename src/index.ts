@@ -48,6 +48,7 @@ export { CommandDeploymentError } from "./errors/CommandDeploymentError";
 export { CommandExecutionError } from "./errors/CommandExecutionError";
 export { EventExecutionError } from "./errors/EventExecutionError";
 export { FeatureDefinitionError } from "./errors/FeatureDefinitionError";
+export { FeatureExecutionError } from "./errors/FeatureExecutionError";
 export { InitializationError } from "./errors/InitializationError";
 export { InteractionAlreadyAcknowledgedError } from "./errors/InteractionAlreadyAcknowledgedError";
 export { InteractionResponseError } from "./errors/InteractionResponseError";

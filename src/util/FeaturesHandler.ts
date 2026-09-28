@@ -1,35 +1,62 @@
-import { Client } from "discord.js";
+import type { Client } from "discord.js";
 import type SWAG from "../SWAG";
-import getAllFiles from "./get-all-files";
+import { FeatureExecutionError } from "../errors/FeatureExecutionError";
+import {
+  discoverFeatures,
+  type DiscoveredFeature,
+} from "../features/discover-features";
+import { FeaturePhase } from "../features/FeaturePhase";
 
 class FeaturesHandler {
-  private _client: Client;
-  private _featuresDir: string;
-  private _instance: SWAG;
-  private _loading: Promise<void> | undefined;
+  private readonly controller = new AbortController();
+  private readonly phaseRuns = new Map<FeaturePhase, Promise<void>>();
+  private features: DiscoveredFeature[] = [];
+  private loading: Promise<void> | undefined;
 
-	constructor(instance: SWAG, featuresDir: string, client: Client) {
-		this._instance = instance;
-		this._featuresDir = featuresDir;
-		this._client = client;
-	}
+  public constructor(
+    private readonly instance: SWAG,
+    private readonly featuresDir: string,
+    private readonly client: Client,
+  ) {}
 
-	public load(): Promise<void> {
-		this._loading ??= this.readFiles();
-		return this._loading;
-	}
+  public load(): Promise<void> {
+    this.loading ??= Promise.resolve().then(() => {
+      this.features = discoverFeatures(this.featuresDir);
+    });
+    return this.loading;
+  }
 
-	private async readFiles() {
-		const files = getAllFiles(this._featuresDir);
+  public runPhase(phase: FeaturePhase): Promise<void> {
+    let run = this.phaseRuns.get(phase);
+    if (!run) {
+      run = this.executePhase(phase);
+      this.phaseRuns.set(phase, run);
+    }
+    return run;
+  }
 
-		for (const file of files) {
-			const func = file.fileContents;
+  private async executePhase(phase: FeaturePhase): Promise<void> {
+    await this.load();
 
-			if (func instanceof Function) {
-				await func(this._instance, this._client);
-			}
-		}
-	}
+    for (const feature of this.features) {
+      if (feature.phase !== phase || feature.kind !== "once") {
+        continue;
+      }
+
+      try {
+        await feature.run({
+          client: this.client,
+          instance: this.instance,
+          signal: this.controller.signal,
+        });
+      } catch (error) {
+        throw new FeatureExecutionError(error, {
+          featureName: feature.name,
+          filePath: feature.filePath,
+        });
+      }
+    }
+  }
 }
 
 export default FeaturesHandler;

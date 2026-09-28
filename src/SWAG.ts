@@ -35,6 +35,7 @@ import {
 import { CommandDeploymentError } from "./errors/CommandDeploymentError";
 import { CommandDefinitionError } from "./errors/CommandDefinitionError";
 import ContextMenuCommandHandler from "./context-menu-handler/ContextMenuCommandHandler";
+import { FeaturePhase } from "./features/FeaturePhase";
 
 export const logger = new Logger();
 
@@ -56,6 +57,7 @@ class SWAGCommands {
   private _cooldownStore: CooldownStore;
   private _preconditions: PreconditionStore;
   private _preconditionHandler: PreconditionHandler | undefined;
+  private _featuresHandler: FeaturesHandler | undefined;
   private _commandDeployer!: CommandDeployer;
   private _state: LifecycleState = "idle";
   private _initialization: Promise<void> | undefined;
@@ -106,7 +108,9 @@ class SWAGCommands {
       if (error instanceof InitializationError) {
         throw error;
       }
-      throw new InitializationError(error);
+      throw new InitializationError(error, {
+        context: error instanceof SwagError ? error.context : undefined,
+      });
     }
   }
 
@@ -156,6 +160,12 @@ class SWAGCommands {
       await this._preconditionHandler.load();
     }
 
+    if (featuresDir) {
+      this._featuresHandler = new FeaturesHandler(this, featuresDir, client);
+      await this._featuresHandler.load();
+      await this._featuresHandler.runPhase(FeaturePhase.BeforeCommands);
+    }
+
     if (commandsDir) {
       this._commandHandler = new CommandHandler(
         this,
@@ -184,14 +194,7 @@ class SWAGCommands {
       await this._subcommandHandler.load();
     }
 
-    if (featuresDir) {
-      const featuresHandler = new FeaturesHandler(
-        this,
-        featuresDir,
-        client,
-      );
-      await featuresHandler.load();
-    }
+    await this._featuresHandler?.runPhase(FeaturePhase.AfterCommands);
 
     this._messageCommandRouter = new MessageCommandRouter(
       this,

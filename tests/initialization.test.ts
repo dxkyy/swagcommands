@@ -7,6 +7,7 @@ const lifecycle = vi.hoisted(() => ({
   eventLoad: vi.fn<() => Promise<void>>(),
   eventRegister: vi.fn<() => void>(),
   featureLoad: vi.fn<() => Promise<void>>(),
+  featureRunPhase: vi.fn<(_phase: string) => Promise<void>>(),
   preconditionLoad: vi.fn<() => Promise<void>>(),
   subcommandLoad: vi.fn<() => Promise<void>>(),
 }));
@@ -46,6 +47,10 @@ vi.mock("../src/util/FeaturesHandler", () => ({
     async load() {
       await lifecycle.featureLoad();
     }
+
+    async runPhase(phase: string) {
+      await lifecycle.featureRunPhase(phase);
+    }
   },
 }));
 
@@ -71,6 +76,8 @@ vi.mock("../src/event-handler/EventHandler", () => ({
 
 import SWAG from "../src/SWAG";
 import { InitializationError } from "../src/errors/InitializationError";
+import { FeaturePhase } from "../src/features/FeaturePhase";
+import { FeatureExecutionError } from "../src/errors/FeatureExecutionError";
 
 type AsyncSWAGConstructor = typeof SWAG & {
   create(options: Record<string, unknown>): Promise<SWAG>;
@@ -97,6 +104,7 @@ describe("SWAG initialization", () => {
     lifecycle.contextMenuLoad.mockResolvedValue(undefined);
     lifecycle.eventLoad.mockResolvedValue(undefined);
     lifecycle.featureLoad.mockResolvedValue(undefined);
+    lifecycle.featureRunPhase.mockResolvedValue(undefined);
     lifecycle.preconditionLoad.mockResolvedValue(undefined);
     lifecycle.subcommandLoad.mockResolvedValue(undefined);
   });
@@ -119,6 +127,10 @@ describe("SWAG initialization", () => {
     expect(lifecycle.contextMenuLoad).toHaveBeenCalledOnce();
     expect(lifecycle.subcommandLoad).toHaveBeenCalledOnce();
     expect(lifecycle.featureLoad).toHaveBeenCalledOnce();
+    expect(lifecycle.featureRunPhase.mock.calls).toEqual([
+      [FeaturePhase.BeforeCommands],
+      [FeaturePhase.AfterCommands],
+    ]);
     expect(lifecycle.preconditionLoad).toHaveBeenCalledOnce();
     expect(lifecycle.eventLoad).toHaveBeenCalledOnce();
     expect(lifecycle.eventRegister).toHaveBeenCalledOnce();
@@ -203,6 +215,73 @@ describe("SWAG initialization", () => {
 
     expect(order).toEqual(["preconditions", "commands"]);
     expect(instance.preconditions).toBeDefined();
+  });
+
+  it("runs feature phases around command loading", async () => {
+    const order: string[] = [];
+    lifecycle.preconditionLoad.mockImplementation(async () => {
+      order.push("preconditions");
+    });
+    lifecycle.featureLoad.mockImplementation(async () => {
+      order.push("discover features");
+    });
+    lifecycle.featureRunPhase.mockImplementation(async (phase) => {
+      order.push(phase);
+    });
+    lifecycle.commandLoad.mockImplementation(async () => {
+      order.push("commands");
+    });
+    lifecycle.contextMenuLoad.mockImplementation(async () => {
+      order.push("context menus");
+    });
+    lifecycle.subcommandLoad.mockImplementation(async () => {
+      order.push("subcommands");
+    });
+    lifecycle.eventRegister.mockImplementation(() => {
+      order.push("register events");
+    });
+
+    await createSWAG({
+      client: createClient(),
+      commandsDir: "/commands",
+      contextMenusDir: "/context-menus",
+      featuresDir: "/features",
+      preconditionsDir: "/preconditions",
+      subcommandsDir: "/subcommands",
+    });
+
+    expect(order).toEqual([
+      "preconditions",
+      "discover features",
+      FeaturePhase.BeforeCommands,
+      "commands",
+      "context menus",
+      "subcommands",
+      FeaturePhase.AfterCommands,
+      "register events",
+    ]);
+  });
+
+  it("preserves feature context when an initialization phase fails", async () => {
+    const failure = new Error("setup failed");
+    lifecycle.featureRunPhase.mockRejectedValueOnce(
+      new FeatureExecutionError(failure, {
+        featureName: "setup",
+        filePath: "/features/setup.ts",
+      }),
+    );
+
+    await expect(createSWAG({
+      client: createClient(),
+      featuresDir: "/features",
+    })).rejects.toMatchObject({
+      code: "SWAG_INITIALIZATION_FAILED",
+      context: {
+        featureName: "setup",
+        filePath: "/features/setup.ts",
+      },
+    } satisfies Partial<InitializationError>);
+    expect(lifecycle.commandLoad).not.toHaveBeenCalled();
   });
 
   it("rejects initialization when no Discord client is provided", async () => {
