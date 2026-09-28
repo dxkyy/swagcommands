@@ -169,6 +169,7 @@ class SWAGCommands {
       this._contextMenuCommandHandler = new ContextMenuCommandHandler(
         this as unknown as SWAG,
         contextMenusDir,
+        this._commandExecutor,
       );
       await this._contextMenuCommandHandler.load();
     }

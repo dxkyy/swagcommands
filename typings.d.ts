@@ -428,7 +428,7 @@ export interface ContextMenuCommandUsageBase {
 export interface UserContextMenuCommandUsage
   extends ContextMenuCommandUsageBase {
   interaction: UserContextMenuCommandInteraction;
-  targetMember: GuildMember | null;
+  targetMember: UserContextMenuCommandInteraction["targetMember"];
   targetUser: User;
 }
 
@@ -828,13 +828,16 @@ export class ContextMenuCommand {
 }
 
 export class ContextMenuCommandHandler {
-  public constructor(instance: SWAG, commandsDir: string);
   public get commands(): Map<string, ContextMenuCommand>;
   public getCommand(
     name: string,
     type: ApplicationCommandType.User | ApplicationCommandType.Message,
   ): ContextMenuCommand | undefined;
   public load(): Promise<void>;
+  public runCommand(
+    command: ContextMenuCommand,
+    interaction: ContextMenuCommandInteraction,
+  ): Promise<void>;
 }
 
 export class MessageCommandRouter {

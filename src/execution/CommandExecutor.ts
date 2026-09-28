@@ -1,13 +1,22 @@
 import {
+  ApplicationCommandType,
   Client,
   CommandInteraction,
+  ContextMenuCommandInteraction,
   GuildMember,
   Message,
   TextChannel,
 } from "discord.js";
 
-import SWAG, { CommandUsage, SubcommandUsage } from "../../typings";
+import SWAG, {
+  CommandUsage,
+  ContextMenuCommandUsage,
+  MessageContextMenuCommandUsage,
+  SubcommandUsage,
+  UserContextMenuCommandUsage,
+} from "../../typings";
 import Command from "../command-handler/Command";
+import ContextMenuCommand from "../context-menu-handler/ContextMenuCommand";
 import CommandType from "../util/CommandType";
 import { CommandExecutionError } from "../errors/CommandExecutionError";
 import { PreconditionExecutionError } from "../errors/PreconditionExecutionError";
@@ -285,9 +294,90 @@ class CommandExecutor {
     }
   }
 
+  public async executeContextMenuCommand(
+    command: ContextMenuCommand,
+    interaction: ContextMenuCommandInteraction,
+  ): Promise<void> {
+    const { callback, deferReply, type } = command.commandObject;
+    if (
+      (type === ApplicationCommandType.User &&
+        !interaction.isUserContextMenuCommand()) ||
+      (type === ApplicationCommandType.Message &&
+        !interaction.isMessageContextMenuCommand())
+    ) {
+      return;
+    }
+
+    const context = {
+      commandName: command.commandName,
+      invocationKind: "interaction" as const,
+    };
+    const usage = this.createContextMenuCommandUsage(command, interaction);
+
+    try {
+      const preconditionResult = await command.preconditions.contextMenuCheck(
+        usage,
+        command,
+      );
+      if (
+        !(await this.handlePreconditionResult(
+          preconditionResult,
+          usage,
+          command,
+          null,
+          interaction,
+          false,
+          context,
+        ))
+      ) {
+        return;
+      }
+      if (
+        !(await this.runPreconditionCommits(
+          preconditionResult,
+          usage,
+          command,
+          null,
+          interaction,
+          false,
+          context,
+        ))
+      ) {
+        return;
+      }
+
+      if (deferReply) {
+        const deferred = await this._instance.responseHandler.defer(
+          interaction,
+          deferReply,
+          context,
+        );
+        if (!deferred) {
+          return;
+        }
+      }
+
+      const response = type === ApplicationCommandType.User
+        ? await callback(usage as UserContextMenuCommandUsage)
+        : await callback(usage as MessageContextMenuCommandUsage);
+      if (response !== undefined) {
+        await this._instance.responseHandler.respondToInteraction(
+          interaction,
+          response,
+          context,
+        );
+      }
+    } catch (error) {
+      await this.reportExecutionError(error, context);
+    }
+  }
+
   private async handlePreconditionResult(
     result: PreconditionResult,
-    usage: MessageCommandUsage | ChatInputCommandUsage,
+    usage:
+      | MessageCommandUsage
+      | ChatInputCommandUsage
+      | ContextMenuCommandUsage,
     command: PreconditionCommand,
     message: Message | null,
     interaction: CommandInteraction | null,
@@ -331,7 +421,10 @@ class CommandExecutor {
 
   private async runPreconditionCommits(
     check: PreconditionCheckResult,
-    usage: MessageCommandUsage | ChatInputCommandUsage,
+    usage:
+      | MessageCommandUsage
+      | ChatInputCommandUsage
+      | ContextMenuCommandUsage,
     command: PreconditionCommand,
     message: Message | null,
     interaction: CommandInteraction | null,
@@ -405,6 +498,42 @@ class CommandExecutor {
       text: args.join(" "),
       user: user!,
     };
+  }
+
+  private createContextMenuCommandUsage(
+    command: ContextMenuCommand,
+    interaction: ContextMenuCommandInteraction,
+  ): ContextMenuCommandUsage {
+    const base = {
+      args: [],
+      channel: interaction.channel as TextChannel,
+      client: command.instance.client as Client,
+      guild: interaction.guild,
+      instance: command.instance,
+      member: interaction.member as GuildMember,
+      message: null as null,
+      text: "",
+      user: interaction.user,
+    };
+
+    if (interaction.isUserContextMenuCommand()) {
+      return {
+        ...base,
+        interaction,
+        targetMember: interaction.targetMember,
+        targetUser: interaction.targetUser,
+      };
+    }
+
+    if (interaction.isMessageContextMenuCommand()) {
+      return {
+        ...base,
+        interaction,
+        targetMessage: interaction.targetMessage,
+      };
+    }
+
+    throw new TypeError("Expected a user or message context-menu interaction.");
   }
 
   private createSubcommandUsage(

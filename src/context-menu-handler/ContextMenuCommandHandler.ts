@@ -1,4 +1,7 @@
-import { ApplicationCommandType } from "discord.js";
+import {
+  ApplicationCommandType,
+  ContextMenuCommandInteraction,
+} from "discord.js";
 import path from "path";
 
 import SWAG, {
@@ -6,6 +9,7 @@ import SWAG, {
   DeferSetting,
 } from "../../typings";
 import { CommandDefinitionError } from "../errors/CommandDefinitionError";
+import CommandExecutor from "../execution/CommandExecutor";
 import { compileCommandPreconditions } from "../preconditions/compile-command-preconditions";
 import { resolveContextMenuPreconditions } from "../preconditions/resolve-command-preconditions";
 import getAllFiles from "../util/get-all-files";
@@ -22,6 +26,7 @@ class ContextMenuCommandHandler {
   public constructor(
     private readonly _instance: SWAG,
     private readonly _commandsDir: string,
+    private readonly _executor: CommandExecutor,
   ) {}
 
   public get commands() {
@@ -35,6 +40,13 @@ class ContextMenuCommandHandler {
   public load(): Promise<void> {
     this._loading ??= this.readFiles();
     return this._loading;
+  }
+
+  public async runCommand(
+    command: ContextMenuCommand,
+    interaction: ContextMenuCommandInteraction,
+  ): Promise<void> {
+    await this._executor.executeContextMenuCommand(command, interaction);
   }
 
   private async readFiles(): Promise<void> {

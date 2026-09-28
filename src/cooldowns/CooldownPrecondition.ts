@@ -175,8 +175,15 @@ export class CooldownPrecondition extends AllFlowsPrecondition {
 }
 
 function getCommandId(command: PreconditionCommand): string {
-  return "parent" in command
-    ? `${command.parent.commandName}/${command.commandName}`
+  if ("parent" in command) {
+    return `${command.parent.commandName}/${command.commandName}`;
+  }
+
+  const type = "commandObject" in command
+    ? command.commandObject.type
+    : undefined;
+  return typeof type === "number"
+    ? `context-menu/${type}/${command.commandName}`
     : command.commandName;
 }
 

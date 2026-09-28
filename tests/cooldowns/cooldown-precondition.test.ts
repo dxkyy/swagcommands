@@ -1,3 +1,4 @@
+import { ApplicationCommandType } from "discord.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -97,6 +98,24 @@ describe("CooldownPrecondition", () => {
 
     expect(createCooldownId(option as never, createUsage() as never)).toBe(
       "cooldown:admin%2Fban:user:user-id",
+    );
+  });
+
+  it("separates same-name context-menu commands by target type", () => {
+    const user = {
+      commandName: "Inspect",
+      commandObject: { type: ApplicationCommandType.User },
+    };
+    const message = {
+      commandName: "Inspect",
+      commandObject: { type: ApplicationCommandType.Message },
+    };
+
+    expect(createCooldownId(user as never, createUsage() as never)).toBe(
+      "cooldown:context-menu%2F2%2FInspect:user:user-id",
+    );
+    expect(createCooldownId(message as never, createUsage() as never)).toBe(
+      "cooldown:context-menu%2F3%2FInspect:user:user-id",
     );
   });
 

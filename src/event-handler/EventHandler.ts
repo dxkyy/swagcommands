@@ -30,6 +30,8 @@ class EventHandler {
 				isButton: (interaction: Interaction) => interaction.isButton(),
 				isChatInputCommand: (interaction: Interaction) =>
 					interaction.isChatInputCommand(),
+				isContextMenuCommand: (interaction: Interaction) =>
+					interaction.isContextMenuCommand(),
 				isCommand: (interaction: Interaction) =>
 					interaction.type === InteractionType.ApplicationCommand,
 				isAutocomplete: (interaction: Interaction) =>

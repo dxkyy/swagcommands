@@ -67,6 +67,7 @@ describe("context-menu command loading", () => {
     const handler = new ContextMenuCommandHandler(
       createInstance() as never,
       "/context-menus",
+      {} as never,
     );
 
     await handler.load();
@@ -107,6 +108,7 @@ describe("context-menu command loading", () => {
     const handler = new ContextMenuCommandHandler(
       createInstance() as never,
       "/context-menus",
+      {} as never,
     );
 
     await handler.load();
@@ -141,6 +143,7 @@ describe("context-menu command loading", () => {
     const handler = new ContextMenuCommandHandler(
       createInstance() as never,
       "/context-menus",
+      {} as never,
     );
 
     await expect(handler.load()).rejects.toThrowError(error);
