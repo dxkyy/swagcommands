@@ -101,7 +101,7 @@ preconditions: [
 
 Returning `true` or `false` is also supported. A bare `false` uses the identifier `INLINE_PRECONDITION_FAILED` and has no default message, so use `preconditionError` when the user should receive a useful response.
 
-Inline checks support normal message and chat-input command execution. Use a class when the check is reusable, needs separate flow implementations, or has a commit phase.
+Inline checks support message, chat-input, subcommand, and context-menu execution. Use a class when the check is reusable, needs separate flow implementations, or has a commit phase.
 
 ## Reusable typed preconditions
 
@@ -124,6 +124,7 @@ import {
   createPreconditionFactory,
   type ChatInputCommandUsage,
   type Command,
+  type ContextMenuCommandUsage,
   type MessageCommandUsage,
   type PreconditionCommand,
   type PreconditionContext,
@@ -146,6 +147,14 @@ class MinimumLevelPrecondition extends AllFlowsPrecondition {
 
   public chatInputRun(
     usage: ChatInputCommandUsage,
+    _command: PreconditionCommand,
+    context: MinimumLevelContext,
+  ) {
+    return this.run(usage.user.id, context);
+  }
+
+  public contextMenuRun(
+    usage: ContextMenuCommandUsage,
     _command: PreconditionCommand,
     context: MinimumLevelContext,
   ) {
@@ -207,7 +216,7 @@ For ordinary definitions, prefer the equivalent top-level properties.
 
 ## Failure responses
 
-Built-in failures with a message respond to users by default. Message commands receive the text through their configured response path. Fresh chat-input interactions receive an ephemeral response.
+Built-in failures with a message respond to users by default. Message commands receive the text through their configured response path. Fresh chat-input and context-menu interactions receive an ephemeral response.
 
 Override `onPreconditionFailure` to customize messages, log failures, or map identifiers:
 
@@ -238,7 +247,7 @@ Execution has two precondition phases:
 2. If all checks pass, run the selected commits immediately before command execution.
 3. Run the callback.
 
-A reusable precondition may implement `messageCommit` and/or `chatInputCommit` in addition to its check methods. Commits are collected only from the successful branch of an `any` group and are discarded if a later check fails.
+A reusable precondition may implement `messageCommit`, `chatInputCommit`, and/or `contextMenuCommit` in addition to its check methods. Commits are collected only from the successful branch of an `any` group and are discarded if a later check fails.
 
 `Cooldown` uses this mechanism. Its check reads the current expiry but does not claim a bucket. Its commit calls the store's atomic `claimCooldown`. Therefore a later `ArgumentCount` failure does not burn a cooldown, and a cooldown may appear anywhere in an `all` or `any` expression without relying on array order.
 
@@ -272,16 +281,16 @@ Preconditions currently run for:
 
 - legacy/message commands;
 - slash/chat-input commands;
-- subcommand roots and selected subcommand leaves.
+- subcommand roots and selected subcommand leaves;
+- user and message context-menu commands.
 
 They do not currently run for:
 
 - autocomplete callbacks;
 - buttons or select menus;
-- modals;
-- context-menu commands.
+- modals.
 
-Autocomplete retains its dedicated callback and error path. Buttons, selects, and modals are handled through events, where applications should call their own shared authorization functions. Context-menu command handling is not implemented yet. Extract the underlying rule into a normal function when command preconditions and component/event handlers must share it.
+Autocomplete retains its dedicated callback and error path. Buttons, selects, and modals are handled through events, where applications should call their own shared authorization functions. Extract the underlying rule into a normal function when command preconditions and component/event handlers must share it.
 
 ## V1 migration
 
