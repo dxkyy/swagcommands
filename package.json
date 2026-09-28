@@ -10,7 +10,8 @@
     "compile": "npm run build",
     "compile:watch": "tsc -w -p tsconfig.json",
     "prepack": "npm run build",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:package",
+    "test:package": "node scripts/test-package.mjs",
     "test:typecheck": "tsc --noEmit -p tsconfig.test.json",
     "test:watch": "vitest"
   },
