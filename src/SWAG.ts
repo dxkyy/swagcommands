@@ -36,11 +36,7 @@ import { CommandDefinitionError } from "./errors/CommandDefinitionError";
 export const logger = new Logger();
 
 export type LifecycleState =
-  | "idle"
-  | "initializing"
-  | "ready"
-  | "failed"
-  | "destroyed";
+  "idle" | "initializing" | "ready" | "failed" | "destroyed";
 
 class SWAGCommands {
   private _client!: Client;
@@ -74,10 +70,7 @@ class SWAGCommands {
     this._prefixStore = options.prefixStore ?? new MemoryPrefixStore();
     this._cooldownStore = options.cooldownStore ?? new MemoryCooldownStore();
     this._preconditions = new PreconditionStore();
-    registerBuiltInPreconditions(
-      this as unknown as SWAG,
-      this._preconditions,
-    );
+    registerBuiltInPreconditions(this as unknown as SWAG, this._preconditions);
     this._responseHandler = new ResponseHandler(this);
     this._commandExecutor = new CommandExecutor(this as unknown as SWAG);
   }
