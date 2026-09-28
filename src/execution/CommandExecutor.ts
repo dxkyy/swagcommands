@@ -174,7 +174,7 @@ class CommandExecutor {
       const rootResult = message
         ? await command.parent.preconditions.messageCheck(
             usage as MessageCommandUsage,
-            command.parent as never,
+            command.parent,
           )
         : await command.parent.preconditions.chatInputCheck(
             usage as ChatInputCommandUsage,
@@ -197,7 +197,7 @@ class CommandExecutor {
       const optionResult = message
         ? await command.preconditions.messageCheck(
             usage as MessageCommandUsage,
-            command as never,
+            command,
           )
         : await command.preconditions.chatInputCheck(
             usage as ChatInputCommandUsage,

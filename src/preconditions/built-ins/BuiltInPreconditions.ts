@@ -11,7 +11,6 @@ import {
   createPreconditionFactory,
 } from "../Precondition";
 import type { PreconditionStore } from "../PreconditionStore";
-import type Command from "../../command-handler/Command";
 import type SWAG from "../../../typings";
 import { CooldownPrecondition } from "../../cooldowns/CooldownPrecondition";
 
@@ -37,7 +36,7 @@ export const HasPermissions = createPreconditionFactory<PermissionsContext>(
 abstract class SharedFlowPrecondition extends AllFlowsPrecondition {
   public messageRun(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: PreconditionContext,
   ) {
     return this.run(usage, command, context);

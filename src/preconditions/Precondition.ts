@@ -6,9 +6,9 @@ import type {
   CommandUsage,
   MessageSubcommandUsage,
 } from "../../typings";
-import type Command from "../command-handler/Command";
 import type SubcommandOption from "../subcommand-handler/SubcommandOption";
 import type Subcommand from "../subcommand-handler/Subcommand";
+import type Command from "../command-handler/Command";
 import {
   createPreconditionFailure,
   createPreconditionSuccess,
@@ -48,7 +48,7 @@ export class Precondition {
 
   public messageRun?(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
 
@@ -60,7 +60,7 @@ export class Precondition {
 
   public messageCommit?(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
 
@@ -82,7 +82,7 @@ export class Precondition {
 export abstract class AllFlowsPrecondition extends Precondition {
   public abstract override messageRun(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
 

@@ -1,4 +1,3 @@
-import type Command from "../../command-handler/Command";
 import type {
   ChatInputCommandUsage,
   MessageCommandUsage,
@@ -49,7 +48,7 @@ export type PreconditionArrayResolvable = readonly PreconditionEntryResolvable[]
 export interface PreconditionContainer {
   messageRun(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionResult>;
 
@@ -61,7 +60,7 @@ export interface PreconditionContainer {
 
   messageCheck(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionCheckResult>;
 

@@ -1,4 +1,3 @@
-import type Command from "../../command-handler/Command";
 import type {
   ChatInputCommandUsage,
   MessageCommandUsage,
@@ -54,7 +53,7 @@ export class PreconditionContainerArray implements PreconditionContainer {
 
   public messageRun(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: PreconditionContext = {},
   ): Promise<PreconditionResult> {
     return this.run((entry) => entry.messageRun(usage, command, context));
@@ -70,7 +69,7 @@ export class PreconditionContainerArray implements PreconditionContainer {
 
   public messageCheck(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: PreconditionContext = {},
   ): Promise<PreconditionCheckResult> {
     return this.check((entry) => entry.messageCheck(usage, command, context));

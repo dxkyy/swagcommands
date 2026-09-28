@@ -1,4 +1,3 @@
-import type Command from "../command-handler/Command";
 import type {
   ChatInputCommandUsage,
   MessageCommandUsage,
@@ -49,7 +48,7 @@ export function createCooldownId(
 export class CooldownPrecondition extends AllFlowsPrecondition {
   public messageRun(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: CooldownPreconditionContext,
   ) {
     return this.run(usage, command, context);
@@ -65,7 +64,7 @@ export class CooldownPrecondition extends AllFlowsPrecondition {
 
   public messageCommit(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: CooldownPreconditionContext,
   ) {
     return this.commit(usage, command, context);

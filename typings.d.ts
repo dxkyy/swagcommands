@@ -404,7 +404,7 @@ export class Precondition {
   public constructor(instance: SWAG, name: string);
   public messageRun?(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
   public chatInputRun?(
@@ -414,7 +414,7 @@ export class Precondition {
   ): Awaitable<PreconditionResult>;
   public messageCommit?(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
   public chatInputCommit?(
@@ -429,7 +429,7 @@ export class Precondition {
 export abstract class AllFlowsPrecondition extends Precondition {
   public abstract messageRun(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: PreconditionContext,
   ): Awaitable<PreconditionResult>;
   public abstract chatInputRun(
@@ -570,7 +570,7 @@ export type PreconditionArrayResolvable = readonly PreconditionEntryResolvable[]
 export interface PreconditionContainer {
   messageRun(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionResult>;
   chatInputRun(
@@ -580,7 +580,7 @@ export interface PreconditionContainer {
   ): Promise<PreconditionResult>;
   messageCheck(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionCheckResult>;
   chatInputCheck(
@@ -612,7 +612,7 @@ export class PreconditionContainerSingle implements PreconditionContainer {
   );
   public messageRun(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionResult>;
   public chatInputRun(
@@ -622,7 +622,7 @@ export class PreconditionContainerSingle implements PreconditionContainer {
   ): Promise<PreconditionResult>;
   public messageCheck(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionCheckResult>;
   public chatInputCheck(
@@ -642,7 +642,7 @@ export class PreconditionContainerArray implements PreconditionContainer {
   );
   public messageRun(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionResult>;
   public chatInputRun(
@@ -652,7 +652,7 @@ export class PreconditionContainerArray implements PreconditionContainer {
   ): Promise<PreconditionResult>;
   public messageCheck(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context?: PreconditionContext,
   ): Promise<PreconditionCheckResult>;
   public chatInputCheck(

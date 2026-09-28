@@ -1,4 +1,3 @@
-import type Command from "../../command-handler/Command";
 import { PreconditionExecutionError } from "../../errors/PreconditionExecutionError";
 import type {
   ChatInputCommandUsage,
@@ -49,7 +48,7 @@ export class PreconditionContainerSingle implements PreconditionContainer {
 
   public async messageRun(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: PreconditionContext = {},
   ) {
     if (this.inline) {
@@ -74,16 +73,17 @@ export class PreconditionContainerSingle implements PreconditionContainer {
         this.mergeContext(context),
       );
     } catch (error) {
-      throw new PreconditionExecutionError(error, precondition.name, {
-        commandName: command.commandName,
-        invocationKind: "message",
-      });
+      throw new PreconditionExecutionError(
+        error,
+        precondition.name,
+        createErrorContext(command, "message"),
+      );
     }
   }
 
   public async messageCheck(
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: PreconditionContext = {},
   ): Promise<PreconditionCheckResult> {
     const result = await this.messageRun(usage, command, context);
@@ -126,16 +126,11 @@ export class PreconditionContainerSingle implements PreconditionContainer {
         this.mergeContext(context),
       );
     } catch (error) {
-      const isSubcommandOption = "parent" in command;
-      throw new PreconditionExecutionError(error, precondition.name, {
-        commandName: isSubcommandOption
-          ? command.parent.commandName
-          : command.commandName,
-        invocationKind: "interaction",
-        subcommandName: isSubcommandOption
-          ? command.commandName
-          : undefined,
-      });
+      throw new PreconditionExecutionError(
+        error,
+        precondition.name,
+        createErrorContext(command, "interaction"),
+      );
     }
   }
 
@@ -182,32 +177,31 @@ export class PreconditionContainerSingle implements PreconditionContainer {
             })
         : result;
     } catch (error) {
-      const isSubcommandOption = "parent" in command;
-      throw new PreconditionExecutionError(error, this.name, {
-        commandName: isSubcommandOption
-          ? command.parent.commandName
-          : command.commandName,
-        invocationKind: "message" in usage && usage.message
-          ? "message"
-          : "interaction",
-        subcommandName: isSubcommandOption ? command.commandName : undefined,
-      });
+      throw new PreconditionExecutionError(
+        error,
+        this.name,
+        createErrorContext(
+          command,
+          "message" in usage && usage.message ? "message" : "interaction",
+        ),
+      );
     }
   }
 
   private async runMessageCommit(
     precondition: Precondition,
     usage: MessageCommandUsage,
-    command: Command,
+    command: PreconditionCommand,
     context: PreconditionContext,
   ): Promise<PreconditionResult> {
     try {
       return await precondition.messageCommit!(usage, command, context);
     } catch (error) {
-      throw new PreconditionExecutionError(error, precondition.name, {
-        commandName: command.commandName,
-        invocationKind: "message",
-      });
+      throw new PreconditionExecutionError(
+        error,
+        precondition.name,
+        createErrorContext(command, "message"),
+      );
     }
   }
 
@@ -220,14 +214,25 @@ export class PreconditionContainerSingle implements PreconditionContainer {
     try {
       return await precondition.chatInputCommit!(usage, command, context);
     } catch (error) {
-      const isSubcommandOption = "parent" in command;
-      throw new PreconditionExecutionError(error, precondition.name, {
-        commandName: isSubcommandOption
-          ? command.parent.commandName
-          : command.commandName,
-        invocationKind: "interaction",
-        subcommandName: isSubcommandOption ? command.commandName : undefined,
-      });
+      throw new PreconditionExecutionError(
+        error,
+        precondition.name,
+        createErrorContext(command, "interaction"),
+      );
     }
   }
+}
+
+function createErrorContext(
+  command: PreconditionCommand,
+  invocationKind: "message" | "interaction",
+) {
+  const isSubcommandOption = "parent" in command;
+  return {
+    commandName: isSubcommandOption
+      ? command.parent.commandName
+      : command.commandName,
+    invocationKind,
+    subcommandName: isSubcommandOption ? command.commandName : undefined,
+  };
 }

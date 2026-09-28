@@ -68,6 +68,22 @@ const createContainer = (
   return new PreconditionContainerArray(store, [name]);
 };
 
+const createMessageContainer = (
+  instance: any,
+  name: string,
+  run: (...args: any[]) => any,
+  commit?: (...args: any[]) => any,
+) => {
+  class TestPrecondition extends Precondition {
+    public override messageRun = run;
+    public override messageCommit = commit;
+  }
+
+  const store = new PreconditionStore();
+  store.register(new TestPrecondition(instance, name));
+  return new PreconditionContainerArray(store, [name]);
+};
+
 const emptyContainer = () =>
   new PreconditionContainerArray(new PreconditionStore());
 
@@ -294,6 +310,139 @@ describe("central command execution", () => {
     expect(message.channel.sendTyping).toHaveBeenCalledOnce();
     expect(message.reply).toHaveBeenCalledWith("Done");
     expect(message.channel.send).not.toHaveBeenCalled();
+  });
+
+  it("runs message root and leaf preconditions before their commits and callback", async () => {
+    const order: string[] = [];
+    const rootRun = vi.fn((_usage: any, _command: any) => {
+      order.push("root-check");
+      return { success: true as const };
+    });
+    const rootCommit = vi.fn(() => {
+      order.push("root-commit");
+      return { success: true as const };
+    });
+    const leafRun = vi.fn((_usage: any, _command: any) => {
+      order.push("leaf-check");
+      return { success: true as const };
+    });
+    const leafCommit = vi.fn(() => {
+      order.push("leaf-commit");
+      return { success: true as const };
+    });
+    const callback = vi.fn(() => {
+      order.push("callback");
+    });
+    const message = createMessage();
+    const { executor, instance } = createExecutor();
+    const rootPreconditions = createMessageContainer(
+      instance,
+      "Root",
+      rootRun,
+      rootCommit,
+    );
+    const leafPreconditions = createMessageContainer(
+      instance,
+      "Leaf",
+      leafRun,
+      leafCommit,
+    );
+    const option = new SubcommandOption(
+      instance,
+      "ban",
+      { callback },
+      leafPreconditions,
+    );
+    const root = new Subcommand(
+      instance,
+      "admin",
+      { type: CommandType.BOTH },
+      [option],
+      rootPreconditions,
+    );
+
+    await executor.executeSubcommand(option, ["user-id"], message as never, null);
+
+    expect(order).toEqual([
+      "root-check",
+      "leaf-check",
+      "root-commit",
+      "leaf-commit",
+      "callback",
+    ]);
+    expect(rootRun.mock.calls[0][1]).toBe(root);
+    expect(leafRun.mock.calls[0][1]).toBe(option);
+    expect(rootRun.mock.calls[0][0]).toMatchObject({ message });
+    expect(leafRun.mock.calls[0][0]).toMatchObject({ message });
+  });
+
+  it("does not commit a message root precondition when the leaf denies", async () => {
+    const rootCommit = vi.fn(() => ({ success: true as const }));
+    const callback = vi.fn();
+    const message = createMessage();
+    const { executor, instance } = createExecutor();
+    const rootPreconditions = createMessageContainer(
+      instance,
+      "Root",
+      () => ({ success: true as const }),
+      rootCommit,
+    );
+    const leafPreconditions = createMessageContainer(instance, "Leaf", () => ({
+      failure: { identifier: "DENIED", preconditionName: "Leaf" },
+      success: false as const,
+    }));
+    const option = new SubcommandOption(
+      instance,
+      "ban",
+      { callback },
+      leafPreconditions,
+    );
+    new Subcommand(
+      instance,
+      "admin",
+      { type: CommandType.LEGACY },
+      [option],
+      rootPreconditions,
+    );
+
+    await executor.executeSubcommand(option, [], message as never, null);
+
+    expect(rootCommit).not.toHaveBeenCalled();
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("reports message leaf precondition errors with the full identity", async () => {
+    const message = createMessage();
+    const { executor, instance, reportError } = createExecutor();
+    const leafPreconditions = createMessageContainer(instance, "Access", () => {
+      throw new Error("database unavailable");
+    });
+    const option = new SubcommandOption(
+      instance,
+      "ban",
+      { callback: vi.fn() },
+      leafPreconditions,
+    );
+    new Subcommand(
+      instance,
+      "admin",
+      { type: CommandType.LEGACY },
+      [option],
+      emptyContainer(),
+    );
+
+    await executor.executeSubcommand(option, [], message as never, null);
+
+    expect(reportError).toHaveBeenCalledOnce();
+    expect(reportError.mock.calls[0][0]).toBeInstanceOf(PreconditionExecutionError);
+    expect(reportError.mock.calls[0][0]).toMatchObject({
+      context: {
+        commandName: "admin",
+        invocationKind: "message",
+        preconditionName: "Access",
+        subcommandName: "ban",
+      },
+    });
   });
 
   it("ignores subcommand invocations outside the root command type", async () => {
