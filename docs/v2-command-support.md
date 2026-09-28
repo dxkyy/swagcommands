@@ -26,8 +26,9 @@ A file in `commandsDir` exports one command object. The filename is its command 
 ```ts
 // commands/ping.ts
 import { CommandType } from "swagcommands";
+import type { CommandObject } from "swagcommands";
 
-export default {
+const command = {
   type: CommandType.BOTH,
   description: "Check whether the bot is responsive",
   aliases: ["p"],
@@ -35,7 +36,9 @@ export default {
   callback: async ({ interaction, message }) => {
     return interaction ? "Slash pong" : `Pong for ${message.author}`;
   },
-};
+} satisfies CommandObject;
+
+export default command;
 ```
 
 `CommandType` controls the available invocation paths:
@@ -65,14 +68,17 @@ The root looks like a normal command definition but does not have a callback:
 ```ts
 // subcommands/admin/index.ts
 import { CommandType } from "swagcommands";
+import type { SubcommandObject } from "swagcommands";
 
-export default {
+const command = {
   type: CommandType.BOTH,
   description: "Administration commands",
   aliases: ["mod"],
   guildOnly: true,
   deferReply: false,
-};
+} satisfies SubcommandObject;
+
+export default command;
 ```
 
 Every leaf is its own command object. This means `/admin ban` can have preconditions, initialization, argument metadata, `deferReply`, `reply`, aliases, and a callback that are independent from `/admin status`:
@@ -83,8 +89,9 @@ import {
   ApplicationCommandOptionType,
   PermissionFlagsBits,
 } from "discord.js";
+import type { SubcommandOptionObject } from "swagcommands";
 
-export default {
+const command = {
   description: "Ban a member",
   aliases: ["b"],
   permissions: [PermissionFlagsBits.BanMembers],
@@ -101,7 +108,9 @@ export default {
     await banMember(args[0]);
     return `${commandName}/${subcommandName} completed`;
   },
-};
+} satisfies SubcommandOptionObject;
+
+export default command;
 ```
 
 Root preconditions run before leaf preconditions. Leaf response settings override root settings; omitted leaf settings inherit from the root.
