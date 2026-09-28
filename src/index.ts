@@ -18,6 +18,17 @@ export interface Preconditions {
 export { default, default as SWAGCommands } from "./SWAG";
 export type { LifecycleState } from "./SWAG";
 export { default as CommandType } from "./util/CommandType";
+export { FeaturePhase } from "./features/FeaturePhase";
+export type {
+  Feature,
+  FeatureCleanup,
+  FeatureContext,
+  FeatureDefinition,
+  FeatureDefinitionBase,
+  FeatureFunction,
+  OneTimeFeature,
+  RecurringFeature,
+} from "./features/Feature";
 
 export { MemoryPrefixStore } from "./prefixes/MemoryPrefixStore";
 export type { PrefixStore } from "./prefixes/PrefixStore";
