@@ -319,8 +319,13 @@ export type CommandDeploymentTarget =
   | { scope: "global" }
   | { scope: "guild"; guildId: string };
 
+export interface DeployedApplicationCommand {
+  name: string;
+  type: ApplicationCommandType;
+}
+
 export type CommandDeploymentTargetResult = CommandDeploymentTarget & {
-  commandNames: readonly string[];
+  commands: readonly Readonly<DeployedApplicationCommand>[];
 };
 
 export interface CommandDeploymentResult {

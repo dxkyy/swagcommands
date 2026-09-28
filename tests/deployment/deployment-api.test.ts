@@ -37,7 +37,7 @@ describe("public command deployment API", () => {
     await expect(
       instance.deployCommands({ scope: "global" }),
     ).resolves.toEqual({
-      targets: [{ scope: "global", commandNames: [] }],
+      targets: [{ scope: "global", commands: [] }],
     });
     await instance.clearCommands({ scope: "guild", guildId: "old-guild" });
 
@@ -87,7 +87,7 @@ describe("public command deployment API", () => {
     expect(error).toMatchObject({
       cause: failure,
       completedTargets: [
-        { scope: "global", commandNames: [] },
+        { scope: "global", commands: [] },
       ],
       context: {
         deploymentScope: "guild",

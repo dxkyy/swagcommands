@@ -1,4 +1,8 @@
-import { Client } from "discord.js";
+import {
+  ApplicationCommandData,
+  ApplicationCommandType,
+  Client,
+} from "discord.js";
 
 import {
   buildCommandManifests,
@@ -16,8 +20,13 @@ export type CommandDeploymentTarget =
   | { scope: "global" }
   | { scope: "guild"; guildId: string };
 
+export interface DeployedApplicationCommand {
+  name: string;
+  type: ApplicationCommandType;
+}
+
 export type CommandDeploymentTargetResult = CommandDeploymentTarget & {
-  commandNames: readonly string[];
+  commands: readonly Readonly<DeployedApplicationCommand>[];
 };
 
 export interface CommandDeploymentResult {
@@ -89,7 +98,7 @@ export class CommandDeployer {
       }
       completedTargets.push({
         ...target,
-        commandNames: getCommandNames(manifests.global),
+        commands: getCommandIdentities(manifests.global),
       });
     }
 
@@ -107,7 +116,7 @@ export class CommandDeployer {
         }
         completedTargets.push({
           ...target,
-          commandNames: getCommandNames(manifests.test),
+          commands: getCommandIdentities(manifests.test),
         });
       }
     }
@@ -157,10 +166,17 @@ function normalizeGuildIds(guildIds: readonly string[]): string[] {
   );
 }
 
-function getCommandNames(
-  commands: readonly { name: string }[],
-): readonly string[] {
-  return Object.freeze(commands.map((command) => command.name));
+function getCommandIdentities(
+  commands: readonly ApplicationCommandData[],
+): readonly Readonly<DeployedApplicationCommand>[] {
+  return Object.freeze(
+    commands.map((command) =>
+      Object.freeze({
+        name: command.name,
+        type: command.type ?? ApplicationCommandType.ChatInput,
+      }),
+    ),
+  );
 }
 
 function formatTarget(target: CommandDeploymentTarget): string {

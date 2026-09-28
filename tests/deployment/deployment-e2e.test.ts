@@ -1,4 +1,8 @@
-import { ApplicationCommandOptionType, Client } from "discord.js";
+import {
+  ApplicationCommandOptionType,
+  ApplicationCommandType,
+  Client,
+} from "discord.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const loading = vi.hoisted(() => {
@@ -42,6 +46,7 @@ const createInstance = (set: ReturnType<typeof vi.fn>) =>
     botOwners: ["owner-id"],
     client: createClient(set),
     commandsDir: "/commands",
+    contextMenusDir: "/context-menus",
     subcommandsDir: "/subcommands",
     testServers: ["guild-b", "guild-a"],
   });
@@ -52,7 +57,7 @@ describe("end-to-end command synchronization", () => {
     loading.getAllFiles.mockClear();
   });
 
-  it("loads and synchronizes normal commands and subcommands by scope", async () => {
+  it("synchronizes chat-input, user, and message commands by scope", async () => {
     loading.files.set("/commands", [
       {
         fileContents: {
@@ -132,6 +137,23 @@ describe("end-to-end command synchronization", () => {
         filePath: "/subcommands/sandbox/try.ts",
       },
     ]);
+    loading.files.set("/context-menus", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          type: ApplicationCommandType.User,
+        },
+        filePath: "/context-menus/Inspect User.ts",
+      },
+      {
+        fileContents: {
+          callback: vi.fn(),
+          testOnly: true,
+          type: ApplicationCommandType.Message,
+        },
+        filePath: "/context-menus/Report Message.ts",
+      },
+    ]);
     const set = vi.fn().mockResolvedValue(new Map());
     const instance = await createInstance(set);
 
@@ -142,6 +164,7 @@ describe("end-to-end command synchronization", () => {
     const firstGuildManifest = set.mock.calls[1]?.[0];
     expect(globalManifest.map((command: { name: string }) => command.name)).toEqual([
       "admin",
+      "Inspect User",
       "ping",
     ]);
     expect(globalManifest).toContainEqual({
@@ -164,20 +187,49 @@ describe("end-to-end command synchronization", () => {
     });
     expect(firstGuildManifest.map(
       (command: { name: string }) => command.name,
-    )).toEqual(["preview", "sandbox"]);
+    )).toEqual(["preview", "Report Message", "sandbox"]);
+    expect(globalManifest).toContainEqual({
+      name: "Inspect User",
+      type: ApplicationCommandType.User,
+    });
+    expect(firstGuildManifest).toContainEqual({
+      name: "Report Message",
+      type: ApplicationCommandType.Message,
+    });
     expect(set.mock.calls[1]?.[1]).toBe("guild-a");
     expect(set.mock.calls[2]?.[1]).toBe("guild-b");
     expect(result.targets).toEqual([
-      { scope: "global", commandNames: ["admin", "ping"] },
+      {
+        scope: "global",
+        commands: [
+          { name: "admin", type: ApplicationCommandType.ChatInput },
+          { name: "Inspect User", type: ApplicationCommandType.User },
+          { name: "ping", type: ApplicationCommandType.ChatInput },
+        ],
+      },
       {
         scope: "guild",
         guildId: "guild-a",
-        commandNames: ["preview", "sandbox"],
+        commands: [
+          { name: "preview", type: ApplicationCommandType.ChatInput },
+          {
+            name: "Report Message",
+            type: ApplicationCommandType.Message,
+          },
+          { name: "sandbox", type: ApplicationCommandType.ChatInput },
+        ],
       },
       {
         scope: "guild",
         guildId: "guild-b",
-        commandNames: ["preview", "sandbox"],
+        commands: [
+          { name: "preview", type: ApplicationCommandType.ChatInput },
+          {
+            name: "Report Message",
+            type: ApplicationCommandType.Message,
+          },
+          { name: "sandbox", type: ApplicationCommandType.ChatInput },
+        ],
       },
     ]);
   });
