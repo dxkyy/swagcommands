@@ -3,9 +3,13 @@
   "version": "1.1.7",
   "description": "",
   "main": "./dist/index.js",
-  "typings": "./typings.d.ts",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
   "scripts": {
-    "compile": "tsc -w --outDir dist --rootDir src --skipLibCheck",
+    "build": "node scripts/build.mjs",
+    "compile": "npm run build",
+    "compile:watch": "tsc -w -p tsconfig.json",
+    "prepack": "npm run build",
     "test": "vitest run",
     "test:typecheck": "tsc --noEmit -p tsconfig.test.json",
     "test:watch": "vitest"
