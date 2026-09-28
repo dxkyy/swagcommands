@@ -28,6 +28,8 @@ class EventHandler {
 		this._builtInEvents = {
 			interactionCreate: {
 				isButton: (interaction: Interaction) => interaction.isButton(),
+				isChatInputCommand: (interaction: Interaction) =>
+					interaction.isChatInputCommand(),
 				isCommand: (interaction: Interaction) =>
 					interaction.type === InteractionType.ApplicationCommand,
 				isAutocomplete: (interaction: Interaction) =>

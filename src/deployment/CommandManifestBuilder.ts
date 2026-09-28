@@ -62,6 +62,13 @@ export function buildCommandManifests({
   }
 
   for (const command of subcommands) {
+    if (
+      command.commandObject.type !== CommandType.SLASH &&
+      command.commandObject.type !== CommandType.BOTH
+    ) {
+      continue;
+    }
+
     const scope = getScope(command.commandObject.testOnly);
     addToManifest(
       manifests,

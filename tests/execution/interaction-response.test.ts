@@ -7,7 +7,7 @@ import { InteractionResponseError } from "../../src/errors/InteractionResponseEr
 import Command from "../../src/command-handler/Command";
 import CommandExecutor from "../../src/execution/CommandExecutor";
 import ResponseHandler from "../../src/execution/ResponseHandler";
-import handleSlashCommand from "../../src/event-handler/events/interactionCreate/isCommand/slash-commands";
+import handleSlashCommand from "../../src/event-handler/events/interactionCreate/isChatInputCommand/slash-commands";
 import CommandType from "../../src/util/CommandType";
 import { PreconditionStore } from "../../src/preconditions/PreconditionStore";
 import { PreconditionContainerArray } from "../../src/preconditions/containers/PreconditionContainerArray";
@@ -17,6 +17,7 @@ const createInteraction = () => ({
   deferReply: vi.fn().mockResolvedValue(undefined),
   deferred: false,
   editReply: vi.fn().mockResolvedValue(undefined),
+  isChatInputCommand: vi.fn().mockReturnValue(true),
   isCommand: vi.fn().mockReturnValue(true),
   options: {
     data: [],
@@ -25,7 +26,11 @@ const createInteraction = () => ({
   reply: vi.fn().mockResolvedValue(undefined),
 });
 
-const createInstance = (response: unknown, deferReply?: unknown) => {
+const createInstance = (
+  response: unknown,
+  deferReply?: unknown,
+  type = CommandType.SLASH,
+) => {
   const reportError = vi.fn().mockResolvedValue(undefined);
   const responseHandler = new ResponseHandler({ reportError });
   const instance: any = {
@@ -40,7 +45,7 @@ const createInstance = (response: unknown, deferReply?: unknown) => {
     {
       callback,
       deferReply: deferReply as never,
-      type: CommandType.SLASH,
+      type,
     },
     new PreconditionContainerArray(new PreconditionStore()),
   );
@@ -64,6 +69,20 @@ const createInstance = (response: unknown, deferReply?: unknown) => {
 };
 
 describe("interaction command responses", () => {
+  it("does not execute legacy-only commands for interactions", async () => {
+    const interaction = createInteraction();
+    const { callback, instance } = createInstance(
+      { content: "Hello" },
+      undefined,
+      CommandType.LEGACY,
+    );
+
+    await handleSlashCommand(interaction as never, instance as never);
+
+    expect(callback).not.toHaveBeenCalled();
+    expect(interaction.reply).not.toHaveBeenCalled();
+  });
+
   it.each([
     "Hello world",
     { content: "Hello world" },

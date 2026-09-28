@@ -217,7 +217,10 @@ describe("command deployment synchronization", () => {
       subcommands: [
         {
           commandName: "duplicate",
-          commandObject: { description: "Duplicate" },
+          commandObject: {
+            description: "Duplicate",
+            type: CommandType.SLASH,
+          },
           options: [],
         },
       ] as never,

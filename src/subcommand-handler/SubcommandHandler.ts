@@ -1,4 +1,9 @@
-import { CommandInteraction, Message } from "discord.js";
+import {
+  ApplicationCommandOptionType,
+  ChatInputCommandInteraction,
+  CommandInteraction,
+  Message,
+} from "discord.js";
 import path from "path";
 
 import SWAG, {
@@ -47,6 +52,58 @@ class SubcommandHandler {
 
   public getLegacyOptions(command: Subcommand) {
     return this._legacyOptions.get(command);
+  }
+
+  public resolveChatInputCommand(
+    interaction: ChatInputCommandInteraction,
+  ):
+    | {
+        args: string[];
+        command: SubcommandOption;
+        subcommandGroup?: string;
+        subcommandName: string;
+      }
+    | undefined {
+    const root = this._subCommands.get(interaction.commandName);
+    const selected = interaction.options.data[0];
+    if (!root || !selected) {
+      return;
+    }
+
+    if (selected.type === ApplicationCommandOptionType.Subcommand) {
+      const command = root.options.find(
+        (option) => option.commandName === selected.name,
+      );
+      if (!command) {
+        return;
+      }
+      return {
+        args: getArgumentValues(selected.options),
+        command,
+        subcommandName: selected.name,
+      };
+    }
+
+    if (selected.type !== ApplicationCommandOptionType.SubcommandGroup) {
+      return;
+    }
+
+    const nested = selected.options?.find(
+      (option) => option.type === ApplicationCommandOptionType.Subcommand,
+    );
+    const command = root.options.find(
+      (option) => option.commandName === selected.name,
+    );
+    if (!command || !nested) {
+      return;
+    }
+
+    return {
+      args: getArgumentValues(nested.options),
+      command,
+      subcommandGroup: selected.name,
+      subcommandName: nested.name,
+    };
   }
 
   public load(): Promise<void> {
@@ -399,6 +456,18 @@ function isValidDeferSetting(setting?: DeferSetting): boolean {
       (setting.ephemeral === undefined ||
         typeof setting.ephemeral === "boolean"))
   );
+}
+
+function getArgumentValues(
+  options:
+    | readonly {
+        value?: unknown;
+      }[]
+    | undefined,
+): string[] {
+  return (options ?? [])
+    .filter((option) => option.value !== undefined)
+    .map((option) => String(option.value));
 }
 
 export default SubcommandHandler;

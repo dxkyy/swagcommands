@@ -42,7 +42,10 @@ class CommandExecutor {
   ): Promise<void> {
     const { callback, deferReply, reply, type } = command.commandObject;
 
-    if (message && type === CommandType.SLASH) {
+    if (
+      (message && type === CommandType.SLASH) ||
+      (interaction && type === CommandType.LEGACY)
+    ) {
       return;
     }
 

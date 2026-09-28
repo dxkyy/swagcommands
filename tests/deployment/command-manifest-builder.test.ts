@@ -200,6 +200,24 @@ describe("application command manifest builder", () => {
     ]);
   });
 
+  it("does not deploy legacy-only subcommand roots", () => {
+    const legacy = createSubcommand(
+      "admin",
+      { type: CommandType.LEGACY },
+      [
+        {
+          fileName: "ban",
+          definition: { callback: vi.fn() },
+        },
+      ],
+    );
+
+    expect(buildCommandManifests({ subcommands: [legacy] })).toEqual({
+      global: [],
+      test: [],
+    });
+  });
+
   it("partitions test commands and rejects duplicate roots per scope", () => {
     const global = createCommand("ping", { type: CommandType.SLASH });
     const test = createCommand("preview", {
