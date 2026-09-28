@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
@@ -36,6 +36,13 @@ try {
   const manifest = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
   assert.equal(manifest.main, "./dist/index.js");
   assert.equal(manifest.types, "./dist/index.d.ts");
+  assert.deepEqual(manifest.exports, {
+    ".": {
+      types: "./dist/index.d.ts",
+      require: "./dist/index.js",
+      default: "./dist/index.js",
+    },
+  });
   assert.ok(existsSync(join(packageDir, manifest.main)), "main must exist in the tarball");
   assert.ok(existsSync(join(packageDir, manifest.types)), "types must exist in the tarball");
   assert.ok(existsSync(join(packageDir, "dist/types.d.ts")), "public contracts must be emitted");
@@ -66,13 +73,15 @@ try {
 
   const consumer = join(temp, "consumer.ts");
   copyFileSync(join(root, "tests", "fixtures", "package-consumer.ts.fixture"), consumer);
+  const esmTypeConsumer = join(temp, "consumer.mts");
+  copyFileSync(join(root, "tests", "fixtures", "package-consumer.mts.fixture"), esmTypeConsumer);
   execFileSync(
     process.execPath,
     [
       join(root, "node_modules", "typescript", "bin", "tsc"),
       "--noEmit", "--strict", "--skipLibCheck", "--target", "es2022",
       "--module", "node16", "--moduleResolution", "node16", "--esModuleInterop",
-      consumer,
+      consumer, esmTypeConsumer,
     ],
     { cwd: temp, stdio: "inherit" },
   );
@@ -84,7 +93,22 @@ try {
   assert.equal(api.CommandType.SLASH, "SLASH");
   assert.equal(typeof api.MemoryPrefixStore, "function");
   assert.equal(typeof api.Precondition, "function");
-  console.log(`Verified ${declarations.length} packaged declarations and CommonJS exports`);
+  assert.throws(
+    () => require("swagcommands/dist/index.js"),
+    { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" },
+    "internal paths must not be public imports",
+  );
+
+  const esmConsumer = join(temp, "consumer.mjs");
+  writeFileSync(esmConsumer, [
+    'import assert from "node:assert/strict";',
+    'import pkg from "swagcommands";',
+    'assert.equal(typeof pkg.default, "function");',
+    'await assert.rejects(import("swagcommands/dist/index.js"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });',
+  ].join("\n"));
+  execFileSync(process.execPath, [esmConsumer], { cwd: temp, stdio: "inherit" });
+
+  console.log(`Verified ${declarations.length} packaged declarations and public imports`);
 } finally {
   rmSync(temp, { recursive: true, force: true });
 }

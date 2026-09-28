@@ -8,6 +8,9 @@ import type {
 } from "swagcommands";
 import { ApplicationCommandType } from "discord.js";
 
+// @ts-expect-error Internal declaration paths are outside the public export map.
+import type { CommandObject as InternalCommandObject } from "swagcommands/dist/types";
+
 declare module "swagcommands" {
   interface Preconditions {
     MinimumLevel: { level: number };

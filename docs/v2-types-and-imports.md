@@ -1,10 +1,10 @@
 # V2 generated types and import migration
 
-V2 publishes JavaScript and TypeScript declarations from the same `src` files. The package entry points are `dist/index.js` and `dist/index.d.ts`; consumers should import from `swagcommands`, not from `src`, `dist`, or the removed root `typings.d.ts`. The tarball contains the generated declarations alongside the JavaScript files they describe.
+V2 publishes JavaScript and TypeScript declarations from the same `src` files. The package entry points are `dist/index.js` and `dist/index.d.ts`. The package exports only the root `swagcommands` import; deep imports into `src`, `dist`, or other internal paths are unavailable. The removed root `typings.d.ts` is no longer an import target. The tarball contains the generated declarations alongside the JavaScript files they describe.
 
 ## Imports
 
-In TypeScript projects that compile with `esModuleInterop`, use the default export for the framework and named exports for helpers. Use `import type` for contracts:
+In TypeScript projects that compile to CommonJS with `esModuleInterop`, use the default export for the framework and named exports for helpers. Use `import type` for contracts:
 
 ```ts
 import SWAG, { CommandType, MemoryPrefixStore } from "swagcommands";
@@ -21,7 +21,7 @@ const { default: SWAG, CommandType } = require("swagcommands");
 // Or: const { SWAGCommands: SWAG } = require("swagcommands");
 ```
 
-When using native Node ESM to import this CommonJS package, access the class through the package object's `default` property:
+When using native Node ESM, including TypeScript files compiled as ESM, the default import is the CommonJS package object. Access the class through its `default` property:
 
 ```js
 import swagcommands from "swagcommands";
@@ -30,6 +30,8 @@ const SWAG = swagcommands.default;
 ```
 
 The runtime export change is intentional for v2. Code using named helpers through `require("swagcommands").CommandType` can keep doing so.
+
+If your code imported an internal path such as `swagcommands/dist/types`, replace it with a type import from `swagcommands`. The root export is the supported API boundary for both JavaScript and TypeScript.
 
 ## Type checked definitions
 
