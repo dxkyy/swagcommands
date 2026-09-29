@@ -1,7 +1,9 @@
-import SWAG, { CommandType, MemoryPrefixStore, SWAGCommands } from "swagcommands";
+import SWAG, { CommandType, FeaturePhase, MemoryPrefixStore, SWAGCommands } from "swagcommands";
 import type {
   CommandObject,
   ContextMenuCommandObject,
+  Feature,
+  FeatureFunction,
   ListedCommandEntry,
   PreconditionArrayResolvable,
   SubcommandObject,
@@ -66,4 +68,15 @@ const invalidAutocomplete: CommandObject = {
 const constructor: typeof SWAGCommands = SWAG;
 const listCommands: () => ListedCommandEntry[] = SWAG.prototype.listCommands;
 const prefixStore = new MemoryPrefixStore();
-void [legacy, slash, both, root, leaf, contextMenu, preconditions, missingContext, invalidAutocomplete, constructor, listCommands, prefixStore];
+const oneTimeFeature: FeatureFunction = ({ client, instance, signal }) => {
+  void [client, instance, signal];
+};
+const recurringFeature = {
+  phase: FeaturePhase.AfterCommands,
+  everyMs: 60_000,
+  runOnStart: true,
+  run: async ({ signal }) => { void signal; },
+} satisfies Feature;
+const startFeatures: () => Promise<void> = SWAG.prototype.startFeatures;
+const stopFeatures: () => Promise<void> = SWAG.prototype.stopFeatures;
+void [legacy, slash, both, root, leaf, contextMenu, preconditions, missingContext, invalidAutocomplete, constructor, listCommands, prefixStore, oneTimeFeature, recurringFeature, startFeatures, stopFeatures];

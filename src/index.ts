@@ -18,6 +18,17 @@ export interface Preconditions {
 export { default, default as SWAGCommands } from "./SWAG";
 export type { LifecycleState } from "./SWAG";
 export { default as CommandType } from "./util/CommandType";
+export { FeaturePhase } from "./features/FeaturePhase";
+export type {
+  Feature,
+  FeatureCleanup,
+  FeatureContext,
+  FeatureDefinition,
+  FeatureDefinitionBase,
+  FeatureFunction,
+  OneTimeFeature,
+  RecurringFeature,
+} from "./features/Feature";
 
 export { MemoryPrefixStore } from "./prefixes/MemoryPrefixStore";
 export type { PrefixStore } from "./prefixes/PrefixStore";
@@ -36,6 +47,9 @@ export { CommandDefinitionError } from "./errors/CommandDefinitionError";
 export { CommandDeploymentError } from "./errors/CommandDeploymentError";
 export { CommandExecutionError } from "./errors/CommandExecutionError";
 export { EventExecutionError } from "./errors/EventExecutionError";
+export { FeatureDefinitionError } from "./errors/FeatureDefinitionError";
+export { FeatureCleanupError } from "./errors/FeatureCleanupError";
+export { FeatureExecutionError } from "./errors/FeatureExecutionError";
 export { InitializationError } from "./errors/InitializationError";
 export { InteractionAlreadyAcknowledgedError } from "./errors/InteractionAlreadyAcknowledgedError";
 export { InteractionResponseError } from "./errors/InteractionResponseError";

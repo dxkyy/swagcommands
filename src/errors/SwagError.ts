@@ -13,6 +13,7 @@ export interface ErrorContext {
   commandName?: string;
   deploymentScope?: "global" | "guild";
   eventName?: string;
+  featureName?: string;
   filePath?: string;
   guildId?: string;
   invocationKind?: InvocationKind;
