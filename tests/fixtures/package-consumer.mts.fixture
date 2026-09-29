@@ -8,8 +8,9 @@ const command: CommandObject = {
   type: swagcommands.CommandType.SLASH,
   callback: ({ interaction }) => interaction.commandName,
 };
+const featurePhase = swagcommands.FeaturePhase.ClientReady;
 
 // @ts-expect-error Deep imports are excluded from the package export map.
 import type { SubcommandObject } from "swagcommands/dist/types";
 
-void [constructor, command];
+void [constructor, command, featurePhase];

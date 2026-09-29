@@ -91,6 +91,8 @@ try {
   assert.equal(typeof api.default, "function");
   assert.equal(api.default, api.SWAGCommands);
   assert.equal(api.CommandType.SLASH, "SLASH");
+  assert.equal(api.FeaturePhase.BeforeCommands, "beforeCommands");
+  assert.equal(api.FeaturePhase.ClientReady, "clientReady");
   assert.equal(typeof api.MemoryPrefixStore, "function");
   assert.equal(typeof api.Precondition, "function");
   assert.throws(
