@@ -1,10 +1,10 @@
 # V2 generated types and import migration
 
-V2 publishes JavaScript and TypeScript declarations from the same `src` files. The package entry points are `dist/index.js` and `dist/index.d.ts`. The package exports only the root `swagcommands` import; deep imports into `src`, `dist`, or other internal paths are unavailable. The removed root `typings.d.ts` is no longer an import target. The tarball contains the generated declarations alongside the JavaScript files they describe.
+V2 publishes JavaScript and TypeScript declarations from the same `src` files. CommonJS uses `dist/index.js` and `dist/index.d.ts`; ESM uses `dist/index.mjs` and `dist/index.d.mts`. The package exports only the root `swagcommands` import; deep imports into `src`, `dist`, or other internal paths are unavailable. The removed root `typings.d.ts` is no longer an import target. The tarball contains the generated declarations alongside the JavaScript files they describe.
 
 ## Imports
 
-In TypeScript projects that compile to CommonJS with `esModuleInterop`, use the default export for the framework and named exports for helpers. Use `import type` for contracts:
+In TypeScript and ESM projects, use the default export for the framework and named exports for helpers. Use `import type` for contracts:
 
 ```ts
 import SWAG, { CommandType, MemoryPrefixStore } from "swagcommands";
@@ -14,22 +14,20 @@ const prefixStore = new MemoryPrefixStore();
 // Pass prefixStore to SWAG.create({ client, prefixStore, ... })
 ```
 
-The class is also available as a named export, `SWAGCommands`. V2 is published as CommonJS. Existing JavaScript using `const SWAG = require("swagcommands")` must use the exported property instead:
+The class is also available as a named export, `SWAGCommands`. CommonJS callers using `const SWAG = require("swagcommands")` must use the exported property instead:
 
 ```js
 const { default: SWAG, CommandType } = require("swagcommands");
 // Or: const { SWAGCommands: SWAG } = require("swagcommands");
 ```
 
-When using native Node ESM, including TypeScript files compiled as ESM, the default import is the CommonJS package object. Access the class through its `default` property:
+Native Node ESM, including TypeScript files compiled as ESM, can import the class directly:
 
 ```js
-import swagcommands from "swagcommands";
-
-const SWAG = swagcommands.default;
+import SWAG from "swagcommands";
 ```
 
-The runtime export change is intentional for v2. Code using named helpers through `require("swagcommands").CommandType` can keep doing so.
+Code using named helpers through `require("swagcommands").CommandType` can keep doing so.
 
 If your code imported an internal path such as `swagcommands/dist/types`, replace it with a type import from `swagcommands`. The root export is the supported API boundary for both JavaScript and TypeScript.
 
@@ -77,4 +75,4 @@ Put the augmentation in a `.ts` or `.d.ts` file included by your project's TypeS
 
 ## Building and checking the package
 
-`npm run build` emits the JavaScript and declaration files in `dist`. `npm pack` runs the build through `prepack`. `npm test` runs the runtime suite and then packs the package, compiles a consumer against its declarations, and checks its CommonJS exports. `npm run test:typecheck` checks the source and test types. Run these checks before publishing a v2 release.
+`npm run build` emits the JavaScript and declaration files in `dist`. `npm pack` runs the build through `prepack`. `npm test` runs the runtime suite and then packs the package, compiles consumers against its declarations, and checks its CommonJS and ESM exports. `npm run test:typecheck` checks the source and test types. Run these checks before publishing a v2 release.

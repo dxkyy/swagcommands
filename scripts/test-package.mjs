@@ -38,12 +38,20 @@ try {
   assert.equal(manifest.types, "./dist/index.d.ts");
   assert.deepEqual(manifest.exports, {
     ".": {
-      types: "./dist/index.d.ts",
-      require: "./dist/index.js",
-      default: "./dist/index.js",
+      import: {
+        types: "./dist/index.d.mts",
+        default: "./dist/index.mjs",
+      },
+      require: {
+        types: "./dist/index.d.ts",
+        default: "./dist/index.js",
+      },
+      default: "./dist/index.mjs",
     },
   });
   assert.ok(existsSync(join(packageDir, manifest.main)), "main must exist in the tarball");
+  assert.ok(existsSync(join(packageDir, "dist/index.mjs")), "ESM entry must exist in the tarball");
+  assert.ok(existsSync(join(packageDir, "dist/index.d.mts")), "ESM declarations must exist in the tarball");
   assert.ok(existsSync(join(packageDir, manifest.types)), "types must exist in the tarball");
   assert.ok(existsSync(join(packageDir, "dist/types.d.ts")), "public contracts must be emitted");
   assert.deepEqual(
@@ -104,8 +112,10 @@ try {
   const esmConsumer = join(temp, "consumer.mjs");
   writeFileSync(esmConsumer, [
     'import assert from "node:assert/strict";',
-    'import pkg from "swagcommands";',
-    'assert.equal(typeof pkg.default, "function");',
+    'import SWAG, { SWAGCommands, CommandType } from "swagcommands";',
+    'assert.equal(typeof SWAG.create, "function");',
+    'assert.equal(SWAG, SWAGCommands);',
+    'assert.equal(CommandType.SLASH, "SLASH");',
     'await assert.rejects(import("swagcommands/dist/index.js"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });',
   ].join("\n"));
   execFileSync(process.execPath, [esmConsumer], { cwd: temp, stdio: "inherit" });
