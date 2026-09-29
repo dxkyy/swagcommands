@@ -53,6 +53,8 @@ export default command;
 
 `CommandObject` selects the callback usage from `type`: `LEGACY` has a message, `SLASH` has a chat-input interaction, and `BOTH` accepts either. Autocomplete callbacks return strings or a promise of strings. For subcommands, use `SubcommandObject` on the root and `SubcommandOptionObject` on each leaf. Context menus use `UserContextMenuCommandObject` or `MessageContextMenuCommandObject` to type their selected target. See [V2 command definitions and routing](v2-command-support.md) for examples.
 
+Feature definitions use the exported `Feature` type and `FeaturePhase` enum. See [V2 features](v2-features.md) for one-time and recurring examples.
+
 ## Custom precondition names
 
 Augment `Preconditions` through the package entry point to check custom names and required context in command definitions:

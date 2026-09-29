@@ -35,6 +35,8 @@ await swag.startFeatures();
 
 Feature objects with `everyMs` run repeatedly at their selected phase. Set `runOnStart: true` to run immediately; otherwise the first run begins after one interval. Each run finishes before the next interval begins. A failed run is reported through `onError` and does not stop later runs. Call `await swag.stopFeatures()` during shutdown to clear feature timers, signal running jobs, and run cleanup functions returned by one-time features. If initialization or client-ready feature startup fails, SWAGCommands performs this cleanup before rejecting.
 
+See [V2 features](v2-features.md) for feature definitions, phases, scheduling, and cleanup examples.
+
 The instance exposes `state` and `isReady()` for lifecycle inspection:
 
 ```ts
