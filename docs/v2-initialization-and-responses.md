@@ -1,0 +1,163 @@
+# V2 initialization and response behavior
+
+V2 makes framework startup explicitly asynchronous and centralizes command, autocomplete, event, and Discord response failures. Command callbacks keep the same convenient return-value API: return a string or a Discord.js response payload and SWAGCommands sends it for you.
+
+## Initialize with `SWAG.create()`
+
+Creating a SWAGCommands instance is now asynchronous. Replace constructor usage with the factory and await it before logging in the Discord client:
+
+```ts
+import { Client, GatewayIntentBits } from "discord.js";
+import SWAG from "swagcommands";
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+});
+
+const swag = await SWAG.create({
+  client,
+  commandsDir: "./commands",
+  contextMenusDir: "./context-menus",
+  subcommandsDir: "./subcommands",
+  featuresDir: "./features",
+  botOwners: ["YOUR_DISCORD_USER_ID"],
+});
+
+await client.login(process.env.DISCORD_TOKEN);
+await swag.startFeatures();
+```
+
+`SWAG.create()` resolves after command, subcommand, context-menu, and event files load, feature discovery completes, `BeforeCommands` and `AfterCommands` one-time features finish, and event listeners are registered. `ClientReady` one-time features run through `startFeatures()`, which waits for the Discord client to become ready and can be called more than once without rerunning them. A plain function feature defaults to `ClientReady`. If local initialization fails, `SWAG.create()` rejects with an `InitializationError`; a partially initialized instance is not returned.
+
+Feature objects with `everyMs` run repeatedly at their selected phase. Set `runOnStart: true` to run immediately; otherwise the first run begins after one interval. Each run finishes before the next interval begins. A failed run is reported through `onError` and does not stop later runs. Call `await swag.stopFeatures()` during shutdown to clear feature timers, signal running jobs, and run cleanup functions returned by one-time features. If initialization or client-ready feature startup fails, SWAGCommands performs this cleanup before rejecting.
+
+See [V2 features](v2-features.md) for feature definitions, phases, scheduling, and cleanup examples.
+
+The instance exposes `state` and `isReady()` for lifecycle inspection:
+
+```ts
+swag.state; // "ready" after SWAG.create() resolves
+swag.isReady(); // true
+```
+
+Initialization no longer creates, updates, or deletes Discord application commands. Command loading is local-only in v2. After the Discord client is ready, synchronize application commands explicitly with `swag.deployCommands()`. See [V2 command deployment and migration](v2-command-deployment.md) for scope, deletion, clearing, and migration behavior.
+
+Supply `botOwners` explicitly when using the `OwnerOnly` precondition. This keeps local initialization independent from Discord application-owner lookups.
+
+## Return Discord.js response values directly
+
+A command callback may return a string, a `MessagePayload`, or the options object accepted by the Discord.js response method used for that invocation:
+
+```ts
+export default {
+  type: CommandType.BOTH,
+  callback: async () => {
+    return "Hello world";
+  },
+};
+```
+
+```ts
+return {
+  content: "Hello world",
+};
+```
+
+```ts
+return {
+  embeds: [embed],
+  components: [row],
+  files: [attachment],
+};
+```
+
+SWAGCommands forwards the returned value to Discord.js without reconstructing the payload:
+
+| Invocation                         | Framework method                |
+| ---------------------------------- | ------------------------------- |
+| Fresh application-command interaction | `interaction.reply(result)`     |
+| Deferred application-command interaction | `interaction.editReply(result)` |
+| Message command with `reply: true` | `message.reply(result)`         |
+| Other message commands             | `message.channel.send(result)`  |
+
+Return `undefined` when the callback handles its own response or should not send one. The framework checks specifically for `undefined`; it does not use a broad truthiness check.
+
+## Deferred responses
+
+Set `deferReply` to `true` to acknowledge an interaction before running the callback. The callback's returned value is then passed to `editReply()`:
+
+```ts
+export default {
+  type: CommandType.SLASH,
+  deferReply: true,
+  callback: async () => {
+    const result = await doSlowWork();
+    return { content: result };
+  },
+};
+```
+
+Use the object form for an ephemeral deferred response:
+
+```ts
+deferReply: {
+  ephemeral: true,
+},
+```
+
+For message commands, `deferReply` sends the channel typing indicator instead of deferring an interaction.
+
+Context-menu commands use the same interaction response behavior. Their typed callback usage additionally exposes `targetUser` and `targetMember` for user commands or `targetMessage` for message commands. See [V2 command definitions and routing](v2-command-support.md).
+
+## Structured errors
+
+Use `onError` to handle framework failures in one place:
+
+```ts
+const swag = await SWAG.create({
+  client,
+  commandsDir: "./commands",
+  onError: async (error, context) => {
+    console.error(error.code, error.phase, context, error.cause);
+  },
+});
+```
+
+Every framework error extends `SwagError` and includes:
+
+- `code`: a stable, machine-readable error code
+- `phase`: `initialization`, `deployment`, `validation`, `execution`,
+  `response`, `autocomplete`, or `event`
+- `context`: relevant command, subcommand, event, file, and invocation details
+- `cause`: the original failure, when one exists
+
+Command callback failures, Discord API response failures, autocomplete failures, and event callback failures are awaited and routed through this hook. Duplicate interaction acknowledgements are reported instead of being silently ignored. Without an `onError` hook, SWAGCommands logs the structured error.
+
+## Autocomplete responses
+
+Autocomplete remains separate from normal command response handling because Discord uses `interaction.respond()` for it. An autocomplete callback returns an array of strings:
+
+```ts
+autocomplete: async (_command, _focusedOption, _interaction) => {
+  return ["apple", "apricot", "banana"];
+},
+```
+
+SWAGCommands filters those strings against the focused value, limits the result to Discord's maximum of 25 choices, and awaits `interaction.respond()`. Invalid results and unexpected callback or response failures are reported as `AutocompleteError`. When the interaction is still respondable, the framework attempts to send an empty choice list so Discord can complete the interaction.
+
+## V1 migration checklist
+
+- Update imports for the v2 CommonJS export shape and use generated declarations from the package entry point. See [V2 generated types and import migration](v2-types-and-imports.md).
+- Replace `new SWAG(options)` with `await SWAG.create(options)`.
+- Catch rejected initialization or let it fail application startup explicitly.
+- Provide `botOwners` when any command or subcommand uses the `OwnerOnly` precondition.
+- Keep common guard fields as v2 precondition sugar, and move functions from `validations.runtime` to [inline or reusable preconditions](v2-preconditions-and-cooldowns.md).
+- Move slash-command deployment out of command loading and call `deployCommands()` only after the Discord client is ready. See [V2 command deployment and migration](v2-command-deployment.md).
+- Remove `delete: true` tombstones; remove the definition and synchronize its scope instead.
+- Use `deferReply: { ephemeral: true }` for ephemeral deferrals.
+- Add `onError` when the application needs custom logging or reporting.
+- Keep returning Discord.js strings and payload objects from callbacks as before.

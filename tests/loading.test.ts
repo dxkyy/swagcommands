@@ -1,0 +1,484 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const loading = vi.hoisted(() => {
+  const files = new Map<
+    string,
+    Array<{
+      fileContents: unknown;
+      filePath: string;
+    }>
+  >();
+
+  return {
+    files,
+    getAllFiles: vi.fn((directory: string) => files.get(directory) ?? []),
+  };
+});
+
+vi.mock("../src/util/get-all-files", () => ({
+  default: loading.getAllFiles,
+}));
+
+import CommandHandler from "../src/command-handler/CommandHandler";
+import CommandExecutor from "../src/execution/CommandExecutor";
+import EventHandler from "../src/event-handler/EventHandler";
+import FeaturesHandler from "../src/util/FeaturesHandler";
+import { FeaturePhase } from "../src/features/FeaturePhase";
+import { FeatureExecutionError } from "../src/errors/FeatureExecutionError";
+import SubcommandHandler from "../src/subcommand-handler/SubcommandHandler";
+import { CommandDefinitionError } from "../src/errors/CommandDefinitionError";
+import { Precondition } from "../src/preconditions/Precondition";
+import { PreconditionStore } from "../src/preconditions/PreconditionStore";
+import { registerBuiltInPreconditions } from "../src/preconditions/built-ins/BuiltInPreconditions";
+
+const createInstance = () => {
+  const instance = {
+    botOwners: ["owner-id"],
+    cooldownStore: {},
+    defaultPrefix: "!",
+    preconditions: new PreconditionStore(),
+    prefixStore: {
+      getPrefix: vi.fn(),
+      setPrefix: vi.fn(),
+    },
+    testServers: [],
+    validations: {},
+  };
+  registerBuiltInPreconditions(instance as never, instance.preconditions);
+  return instance;
+};
+
+describe("explicit handler loading", () => {
+  beforeEach(() => {
+    loading.files.clear();
+  });
+
+  it("does not discover runtime validation modules", async () => {
+    const instance = createInstance() as never;
+    const executor = {} as CommandExecutor;
+    const client = {} as never;
+
+    await new CommandHandler(instance, "/commands", client, executor).load();
+    await new SubcommandHandler(
+      instance,
+      "/subcommands",
+      executor,
+    ).load();
+
+    expect(
+      loading.getAllFiles.mock.calls.some(([directory]) =>
+        directory.includes("run-time"),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not load or initialize commands in the constructor", async () => {
+    let finishInitialization!: () => void;
+    const init = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishInitialization = resolve;
+        }),
+    );
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          init,
+          type: "LEGACY",
+        },
+        filePath: "/commands/hello.ts",
+      },
+    ]);
+
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    expect(loading.getAllFiles).not.toHaveBeenCalled();
+    expect(init).not.toHaveBeenCalled();
+
+    const firstLoad = handler.load();
+    const secondLoad = handler.load();
+
+    expect(firstLoad).toBe(secondLoad);
+    await vi.waitFor(() => {
+      expect(init).toHaveBeenCalledOnce();
+    });
+    expect(handler.commands.has("hello")).toBe(false);
+
+    finishInitialization();
+    await firstLoad;
+
+    expect(handler.commands.has("hello")).toBe(true);
+    await handler.load();
+    expect(init).toHaveBeenCalledOnce();
+  });
+
+  it("discovers features once and awaits each one-time phase once", async () => {
+    let finishFeature!: () => void;
+    const feature = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishFeature = resolve;
+        }),
+    );
+    loading.files.set("/features", [
+      {
+        fileContents: {
+          phase: FeaturePhase.AfterCommands,
+          run: feature,
+        },
+        filePath: "/features/feature.ts",
+      },
+    ]);
+
+    const handler = new FeaturesHandler(
+      createInstance() as never,
+      "/features",
+      {} as never,
+    );
+
+    expect(loading.getAllFiles).not.toHaveBeenCalled();
+    expect(feature).not.toHaveBeenCalled();
+
+    const firstLoad = handler.load();
+    const secondLoad = handler.load();
+
+    expect(firstLoad).toBe(secondLoad);
+    await firstLoad;
+    expect(feature).not.toHaveBeenCalled();
+
+    const firstRun = handler.runPhase(FeaturePhase.AfterCommands);
+    const secondRun = handler.runPhase(FeaturePhase.AfterCommands);
+    expect(firstRun).toBe(secondRun);
+    await vi.waitFor(() => {
+      expect(feature).toHaveBeenCalledOnce();
+    });
+
+    finishFeature();
+    await firstRun;
+    await handler.load();
+    await handler.runPhase(FeaturePhase.AfterCommands);
+
+    expect(feature).toHaveBeenCalledOnce();
+    expect(loading.getAllFiles).toHaveBeenCalledOnce();
+    expect(feature).toHaveBeenCalledWith({
+      client: expect.any(Object),
+      instance: expect.any(Object),
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it("reports one-time feature failures with their name and path", async () => {
+    const failure = new Error("feature failed");
+    loading.files.set("/features", [
+      {
+        fileContents: {
+          name: "setup",
+          phase: FeaturePhase.BeforeCommands,
+          run: () => { throw failure; },
+        },
+        filePath: "/features/setup.ts",
+      },
+    ]);
+    const handler = new FeaturesHandler(
+      createInstance() as never,
+      "/features",
+      {} as never,
+    );
+
+    await expect(handler.runPhase(FeaturePhase.BeforeCommands)).rejects.toMatchObject({
+      cause: failure,
+      code: "SWAG_FEATURE_EXECUTION_FAILED",
+      context: {
+        featureName: "setup",
+        filePath: "/features/setup.ts",
+      },
+    } satisfies Partial<FeatureExecutionError>);
+  });
+
+  it("runs plain functions once at the client-ready phase", async () => {
+    const run = vi.fn();
+    loading.files.set("/features", [
+      { fileContents: run, filePath: "/features/analytics.ts" },
+    ]);
+    const client = {};
+    const instance = createInstance();
+    const handler = new FeaturesHandler(instance as never, "/features", client as never);
+
+    await handler.load();
+    await handler.runPhase(FeaturePhase.AfterCommands);
+    expect(run).not.toHaveBeenCalled();
+    expect(handler.hasPhase(FeaturePhase.ClientReady)).toBe(true);
+
+    await handler.runPhase(FeaturePhase.ClientReady);
+    await handler.runPhase(FeaturePhase.ClientReady);
+    expect(run).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledWith({
+      client,
+      instance,
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it("does not deploy slash commands while loading command definitions", async () => {
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          description: "A test command",
+          type: "SLASH",
+        },
+        filePath: "/commands/test.ts",
+      },
+    ]);
+    const applicationCommands = {
+      cache: {
+        find: vi.fn(),
+      },
+      create: vi.fn(),
+      fetch: vi.fn(),
+    };
+    const client = {
+      application: {
+        commands: applicationCommands,
+      },
+    };
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      client as never,
+      {} as CommandExecutor,
+    );
+
+    await handler.load();
+
+    expect(handler.commands.has("test")).toBe(true);
+    expect(applicationCommands.fetch).not.toHaveBeenCalled();
+    expect(applicationCommands.create).not.toHaveBeenCalled();
+    expect(applicationCommands.cache.find).not.toHaveBeenCalled();
+  });
+
+  it("treats the removed delete tombstone as ordinary unknown metadata", async () => {
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          delete: true,
+          description: "A retained command",
+          type: "SLASH",
+        },
+        filePath: "/commands/retained.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await handler.load();
+
+    expect(handler.commands.has("retained")).toBe(true);
+  });
+
+  it("resolves registered command preconditions while loading", async () => {
+    class Allowed extends Precondition {
+      public messageRun() {
+        return this.ok();
+      }
+
+      public chatInputRun() {
+        return this.ok();
+      }
+    }
+    const instance = createInstance();
+    instance.preconditions.register(
+      new Allowed(instance as never, "Allowed"),
+    );
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          preconditions: ["Allowed"],
+          type: "BOTH",
+        },
+        filePath: "/commands/hello.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      instance as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await handler.load();
+
+    const command = handler.commands.get("hello");
+    expect(command?.preconditions.entries).toHaveLength(1);
+    expect(command?.preconditions.entries[0]).toMatchObject({
+      name: "Allowed",
+    });
+  });
+
+  it("compiles common command flags before explicit preconditions", async () => {
+    const inline = vi.fn(() => true);
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          expectedArgs: "<project>",
+          guildOnly: true,
+          maxArgs: 1,
+          minArgs: 1,
+          ownerOnly: true,
+          permissions: [8n],
+          preconditions: [inline],
+          testOnly: true,
+          type: "LEGACY",
+        },
+        filePath: "/commands/secure.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await handler.load();
+
+    const command = handler.commands.get("secure")!;
+    expect(command.preconditions.entries.slice(0, 5).map((entry: any) => entry.name)).toEqual([
+      "GuildOnly",
+      "OwnerOnly",
+      "TestOnly",
+      "HasPermissions",
+      "ArgumentCount",
+    ]);
+    expect(command.preconditions.entries).toHaveLength(6);
+    expect(command.commandObject.expectedArgs).toBe("<project>");
+  });
+
+  it("rejects ambiguous nested arrays in favor of explicit combinators", async () => {
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          preconditions: [["GuildOnly", "OwnerOnly"]],
+          type: "LEGACY",
+        },
+        filePath: "/commands/secure.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await expect(handler.load()).rejects.toThrow(
+      "Nested arrays are not supported",
+    );
+  });
+
+  it("rejects unavailable command preconditions during loading", async () => {
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          preconditions: ["Missing"],
+          type: "LEGACY",
+        },
+        filePath: "/commands/hello.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      createInstance() as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await expect(handler.load()).rejects.toMatchObject({
+      code: "SWAG_COMMAND_DEFINITION_INVALID",
+      context: {
+        commandName: "hello",
+        filePath: "/commands/hello.ts",
+      },
+      message: expect.stringContaining(
+        'The precondition "Missing" is not registered.',
+      ),
+    } satisfies Partial<CommandDefinitionError>);
+  });
+
+  it("rejects preconditions that do not support every command flow", async () => {
+    class MessageOnly extends Precondition {
+      public messageRun() {
+        return this.ok();
+      }
+    }
+    const instance = createInstance();
+    instance.preconditions.register(
+      new MessageOnly(instance as never, "MessageOnly"),
+    );
+    loading.files.set("/commands", [
+      {
+        fileContents: {
+          callback: vi.fn(),
+          preconditions: ["MessageOnly"],
+          type: "BOTH",
+        },
+        filePath: "/commands/hello.ts",
+      },
+    ]);
+    const handler = new CommandHandler(
+      instance as never,
+      "/commands",
+      {} as never,
+      {} as CommandExecutor,
+    );
+
+    await expect(handler.load()).rejects.toMatchObject({
+      code: "SWAG_COMMAND_DEFINITION_INVALID",
+      message: expect.stringContaining(
+        'The precondition "MessageOnly" does not support chat-input commands.',
+      ),
+    } satisfies Partial<CommandDefinitionError>);
+  });
+
+  it("loads event definitions before registering listeners", async () => {
+    const client = {
+      on: vi.fn(),
+    };
+    const handler = new EventHandler(
+      createInstance() as never,
+      { dir: "/events" },
+      client as never,
+    );
+
+    expect(loading.getAllFiles).not.toHaveBeenCalled();
+    expect(client.on).not.toHaveBeenCalled();
+
+    const firstLoad = handler.load();
+    const secondLoad = handler.load();
+    expect(firstLoad).toBe(secondLoad);
+    await firstLoad;
+
+    expect(client.on).not.toHaveBeenCalled();
+
+    handler.registerEvents();
+    handler.registerEvents();
+
+    expect(client.on).not.toHaveBeenCalled();
+    expect(loading.getAllFiles).toHaveBeenCalled();
+  });
+});

@@ -1,11 +1,32 @@
 {
   "name": "swagcommands",
-  "version": "1.1.7",
+  "version": "2.0.0",
   "description": "",
   "main": "./dist/index.js",
-  "typings": "./typings.d.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": ["dist"],
   "scripts": {
-    "compile": "tsc -w --outDir dist --rootDir src --skipLibCheck"
+    "build": "node scripts/build.mjs",
+    "compile": "npm run build",
+    "compile:watch": "tsc -w -p tsconfig.json",
+    "prepack": "npm run build",
+    "test": "vitest run && npm run test:package",
+    "test:package": "node scripts/test-package.mjs",
+    "test:typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test:watch": "vitest"
   },
   "keywords": [
     "discord",
@@ -24,6 +45,8 @@
     "url": "https://github.com/dxkyy/swagcommands"
   },
   "devDependencies": {
-    "typescript": "^7.0.2"
+    "@types/node": "^26.6.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
   }
 }
