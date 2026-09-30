@@ -39,6 +39,7 @@ export {
   CooldownPrecondition,
   CooldownScope,
   createCooldownId,
+  isCooldownActiveFailure,
 } from "./cooldowns/CooldownPrecondition";
 export type { CooldownPreconditionContext } from "./cooldowns/CooldownPrecondition";
 
@@ -97,12 +98,15 @@ export type {
   PreconditionContext,
 } from "./preconditions/Precondition";
 export type {
+  CooldownActiveFailure,
+  CustomPreconditionFailure,
   PreconditionFailure,
   PreconditionFailureOptions,
   PreconditionFailureResult,
   PreconditionResult,
   PreconditionSuccessResult,
 } from "./preconditions/PreconditionResult";
+export { FailureType } from "./preconditions/PreconditionResult";
 export { PreconditionContainerArray, PreconditionRunCondition } from "./preconditions/containers/PreconditionContainerArray";
 export { PreconditionContainerSingle } from "./preconditions/containers/PreconditionContainerSingle";
 export type {

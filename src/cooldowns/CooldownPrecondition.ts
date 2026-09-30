@@ -9,6 +9,8 @@ import {
   AllFlowsPrecondition,
   createPreconditionFactory,
 } from "../preconditions/Precondition";
+import { FailureType } from "../preconditions/PreconditionResult";
+import type { CooldownActiveFailure, PreconditionFailure } from "../preconditions/PreconditionResult";
 
 type CooldownUsage =
   | MessageCommandUsage
@@ -20,6 +22,23 @@ export enum CooldownScope {
   Channel = "channel",
   Guild = "guild",
   Global = "global",
+}
+
+export function isCooldownActiveFailure(
+  failure: Readonly<PreconditionFailure>,
+): failure is Readonly<CooldownActiveFailure> {
+  if (failure.type !== FailureType.CooldownActive
+    || failure.preconditionName !== "Cooldown"
+    || failure.identifier !== "COOLDOWN_ACTIVE") {
+    return false;
+  }
+
+  const context = failure.context;
+  return context !== undefined
+    && typeof context.cooldownId === "string"
+    && typeof context.expiresAt === "number"
+    && typeof context.remaining === "number"
+    && Object.values(CooldownScope).includes(context.scope as CooldownScope);
 }
 
 export interface CooldownPreconditionContext extends PreconditionContext {

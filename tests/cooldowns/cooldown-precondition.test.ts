@@ -5,8 +5,10 @@ import {
   CooldownPrecondition,
   CooldownScope,
   createCooldownId,
+  isCooldownActiveFailure,
 } from "../../src/cooldowns/CooldownPrecondition";
 import { MemoryCooldownStore } from "../../src/cooldowns/MemoryCooldownStore";
+import { createPreconditionFailure } from "../../src/preconditions/PreconditionResult";
 
 const createUsage = (overrides: Record<string, unknown> = {}) => ({
   args: [],
@@ -20,6 +22,24 @@ const createUsage = (overrides: Record<string, unknown> = {}) => ({
 const command = { commandName: "ping" };
 
 describe("CooldownPrecondition", () => {
+  it("recognizes only cooldown failures with a valid active context", () => {
+    const active = createPreconditionFailure("Cooldown", {
+      identifier: "COOLDOWN_ACTIVE",
+      context: {
+        cooldownId: "cooldown:ping:user:user-id",
+        expiresAt: 10_000,
+        remaining: 5_000,
+        scope: CooldownScope.User,
+      },
+    }).failure;
+    expect(isCooldownActiveFailure(active)).toBe(true);
+    expect(isCooldownActiveFailure({ ...active, preconditionName: "Custom" })).toBe(false);
+    expect(isCooldownActiveFailure(createPreconditionFailure("Cooldown", {
+      identifier: "COOLDOWN_ACTIVE",
+      context: { remaining: "5000" },
+    }).failure)).toBe(false);
+  });
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));

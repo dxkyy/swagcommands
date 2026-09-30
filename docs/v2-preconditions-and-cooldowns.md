@@ -272,6 +272,18 @@ Cooldown({
 ```
 
 An active failure includes `cooldownId`, `scope`, `expiresAt`, and `remaining` milliseconds.
+`FailureType` also covers every built-in and framework failure, including argument count, guild and permission checks, cooldown configuration errors, and unavailable or missing precondition handlers. Unknown identifiers use `FailureType.Custom`.
+Since custom preconditions can supply arbitrary context, check `failure.type` to narrow the failure before reading those fields in a TypeScript callback:
+
+```ts
+import { FailureType } from "swagcommands";
+
+onPreconditionFailure: ({ failure }) => {
+  if (failure.type === FailureType.CooldownActive) {
+    return `Try again in ${Math.round(failure.context.remaining / 1000)}s.`;
+  }
+},
+```
 
 `MemoryCooldownStore` is the default. Inject a persistent store through `cooldownStore` for restarts or multiple processes. Its `claimCooldown(cooldownId, expiresAt, now)` implementation must atomically return `{ acquired: true, expiresAt }` after claiming a missing or expired bucket, or `{ acquired: false, expiresAt: activeExpiration }` when a live claim exists. Use a transaction, script, or compare-and-set operation in a distributed backend.
 

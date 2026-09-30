@@ -36,6 +36,7 @@ describe("Precondition", () => {
         identifier: "OWNER_ONLY",
         message: "Only the owner can use this command.",
         preconditionName: "OwnerOnly",
+        type: "custom",
       },
       success: false,
     });
