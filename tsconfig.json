@@ -5,9 +5,12 @@
 		"module": "commonjs",
 		"outDir": "./dist",
 		"rootDir": "./src",
+		"declaration": true,
+		"noEmitOnError": true,
 		"strict": true,
 		"esModuleInterop": true,
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true
-	}
+	},
+	"include": ["src/**/*.ts"]
 }

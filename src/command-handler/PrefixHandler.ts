@@ -1,4 +1,4 @@
-import SWAG from "../../typings";
+import type SWAG from "../SWAG";
 
 class PrefixHandler {
   private _defaultPrefix = "!";

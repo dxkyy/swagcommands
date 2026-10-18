@@ -1,192 +1,478 @@
 import {
   ApplicationCommandOptionType,
-  Client,
-  CommandInteraction,
-  GuildMember,
+  ChatInputCommandInteraction,
   Message,
-  MessagePayload,
-  TextChannel,
 } from "discord.js";
 import path from "path";
 
+import type SWAG from "../SWAG";
+import type {
+  DeferSetting,
+  SubcommandObject,
+  SubcommandOptionObject,
+} from "../types";
+import CommandExecutor from "../execution/CommandExecutor";
+import { CommandDefinitionError } from "../errors/CommandDefinitionError";
+import { compileCommandPreconditions } from "../preconditions/compile-command-preconditions";
+import { resolveCommandPreconditions } from "../preconditions/resolve-command-preconditions";
+import CommandType from "../util/CommandType";
 import getAllFiles from "../util/get-all-files";
 import Subcommand from "./Subcommand";
 import SubcommandOption from "./SubcommandOption";
-import SubSlashCommands from "./SubSlashCommand";
-import PrefixHandler from "../command-handler/PrefixHandler";
-import SWAG, {
-  SubcommandObject,
-  SubcommandOptionObject,
-  SubCommandUsage,
-} from "../../typings";
 
-class CommandHandler {
-  // <commandName, instance of the Command class>
-  private _subCommands: Map<string, Subcommand> = new Map();
-  private _validations = this.getValidations(
-    path.join(__dirname, "validations", "run-time"),
-  );
-  private _instance: SWAG;
-  private _client: Client;
-  private _commandsDir: string;
-  private _slashCommands: SubSlashCommands;
-  private _prefixes: PrefixHandler;
+class SubcommandHandler {
+  private readonly _subCommands = new Map<string, Subcommand>();
+  private readonly _legacyCommands = new Map<string, Subcommand>();
+  private readonly _legacyOptions = new Map<
+    Subcommand,
+    Map<string, SubcommandOption>
+  >();
+  private readonly _instance: SWAG;
+  private readonly _commandsDir: string;
+  private readonly _executor: CommandExecutor;
+  private _loading: Promise<void> | undefined;
 
-  constructor(instance: SWAG, commandsDir: string, client: Client) {
+  public constructor(
+    instance: SWAG,
+    commandsDir: string,
+    executor: CommandExecutor,
+  ) {
     this._instance = instance;
     this._commandsDir = commandsDir;
-    this._slashCommands = new SubSlashCommands(client);
-    this._client = client;
-
-    this._validations = [
-      ...this._validations,
-      ...this.getValidations(instance.validations?.runtime),
-    ];
-
-    this.readFiles();
-    this._prefixes = new PrefixHandler(instance);
+    this._executor = executor;
   }
 
   public get commands() {
     return this._subCommands;
   }
 
-  public get slashCommands() {
-    return this._slashCommands;
+  public get legacyCommands() {
+    return this._legacyCommands;
   }
 
-  private async readFiles() {
-    const files = getAllFiles(this._commandsDir, true);
-    const validations = [
-      ...this.getValidations(path.join(__dirname, "validations", "syntax")),
-      ...this.getValidations(this._instance.validations?.syntax),
-    ];
+  public getLegacyOptions(command: Subcommand) {
+    return this._legacyOptions.get(command);
+  }
 
-    for (let fileData of [...files]) {
-      const { filePath } = fileData;
-      const split = filePath.split(/[\/\\]/);
-      let commandName = split.pop()!;
+  public resolveChatInputCommand(
+    interaction: ChatInputCommandInteraction,
+  ):
+    | {
+        args: string[];
+        command: SubcommandOption;
+        subcommandGroup?: string;
+        subcommandName: string;
+      }
+    | undefined {
+    const root = this._subCommands.get(interaction.commandName);
+    const selected = interaction.options.data[0];
+    if (!root || !selected) {
+      return;
+    }
 
-      const options = getAllFiles(filePath);
-      let optionDatas: SubcommandOption[] = [];
-      let index = null;
+    if (selected.type === ApplicationCommandOptionType.Subcommand) {
+      const command = root.options.find(
+        (option) => option.commandName === selected.name,
+      );
+      if (!command) {
+        return;
+      }
+      return {
+        args: getArgumentValues(selected.options),
+        command,
+        subcommandName: selected.name,
+      };
+    }
 
-      for (let option of options) {
-        const { filePath } = option;
-        const split = filePath.split(/[\/\\]/);
-        let optionName = split.pop()!;
-        optionName = optionName.split(".")[0];
+    if (selected.type !== ApplicationCommandOptionType.SubcommandGroup) {
+      return;
+    }
 
-        if (optionName === "index") {
-          index = option;
-          continue;
-        }
+    const nested = selected.options?.find(
+      (option) => option.type === ApplicationCommandOptionType.Subcommand,
+    );
+    const command = root.options.find(
+      (option) => option.commandName === selected.name,
+    );
+    if (!command || !nested) {
+      return;
+    }
 
-        const optionObject: SubcommandOptionObject = option.fileContents;
+    return {
+      args: getArgumentValues(nested.options),
+      command,
+      subcommandGroup: selected.name,
+      subcommandName: nested.name,
+    };
+  }
 
-        const subCommandOption = new SubcommandOption(
-          this._instance,
-          optionName,
-          optionObject,
+  public load(): Promise<void> {
+    this._loading ??= this.readFiles();
+    return this._loading;
+  }
+
+  private async readFiles(): Promise<void> {
+    const folders = getAllFiles(this._commandsDir, true);
+    const customValidations = this.getValidations(
+      this._instance.validations?.syntax,
+    );
+
+    for (const { filePath: folderPath } of folders) {
+      const commandName = path.basename(folderPath).toLowerCase();
+      const files = getAllFiles(folderPath);
+      const indexFiles = files.filter(
+        ({ filePath }) => path.basename(filePath).split(".")[0] === "index",
+      );
+
+      if (indexFiles.length !== 1) {
+        throw this.definitionError(
+          commandName,
+          indexFiles.length === 0
+            ? "A subcommand root must define exactly one index file."
+            : "A subcommand root cannot define more than one index file.",
+          folderPath,
         );
-        optionDatas.push(subCommandOption);
       }
 
-      const commandObject: SubcommandObject = require(filePath).default;
+      const index = indexFiles[0];
+      const commandObject = index.fileContents as SubcommandObject;
+      this.validateRoot(commandName, commandObject, index.filePath);
 
+      const rootPreconditions = resolveCommandPreconditions(
+        this._instance.preconditions,
+        compileCommandPreconditions(commandObject),
+        {
+          commandName,
+          commandType: commandObject.type,
+          filePath: index.filePath,
+        },
+      );
+      const options = this.createOptions(
+        commandName,
+        commandObject,
+        files.filter((file) => file !== index),
+      );
       const command = new Subcommand(
         this._instance,
         commandName,
         commandObject,
-        optionDatas,
+        options,
+        rootPreconditions,
       );
 
-      const { description, testOnly, delete: del } = commandObject;
-
-      if (del) {
-        if (testOnly) {
-          for (const guildId of this._instance.testServers) {
-            this._slashCommands.delete(command.commandName, guildId);
-          }
-        } else {
-          this._slashCommands.delete(command.commandName);
+      for (const validation of customValidations) {
+        validation(command);
+        for (const option of options) {
+          validation(option);
         }
-
-        continue;
       }
 
-      if (!index)
-        for (const validation of validations) {
-          validation(command);
-        }
-
-      const names = [command.commandName];
-
-      for (const name of names) {
-        this._subCommands.set(name, command);
+      await commandObject.init?.(this._instance.client, this._instance);
+      for (const option of options) {
+        await option.optionObject.init?.(this._instance.client, this._instance);
       }
 
-      if (testOnly) {
-        for (const guildId of this._instance.testServers) {
-          this._slashCommands.create(
-            command.commandName,
-            description!,
-            optionDatas,
-            guildId,
+      this.registerRoot(command, index.filePath);
+    }
+  }
+
+  private createOptions(
+    commandName: string,
+    commandObject: SubcommandObject,
+    files: ReturnType<typeof getAllFiles>,
+  ): SubcommandOption[] {
+    const options: SubcommandOption[] = [];
+    const names = new Set<string>();
+
+    for (const { fileContents, filePath } of files) {
+      const optionName = path.basename(filePath).split(".")[0].toLowerCase();
+      const optionObject = fileContents as SubcommandOptionObject;
+      this.validateOption(
+        commandName,
+        optionName,
+        commandObject.type,
+        optionObject,
+        filePath,
+      );
+
+      for (const name of [optionName, ...(optionObject.aliases ?? [])]) {
+        const normalizedName = this.normalizeName(
+          name,
+          commandName,
+          filePath,
+          optionName,
+        );
+        if (names.has(normalizedName)) {
+          throw this.definitionError(
+            commandName,
+            `Subcommand name or alias "${normalizedName}" is defined more than once.`,
+            filePath,
+            optionName,
           );
         }
-      } else {
-        this._slashCommands.create(
+        names.add(normalizedName);
+      }
+
+      const preconditions = resolveCommandPreconditions(
+        this._instance.preconditions,
+        compileCommandPreconditions(optionObject),
+        {
+          commandName,
+          commandType: commandObject.type,
+          filePath,
+          subcommandName: optionName,
+        },
+      );
+      options.push(
+        new SubcommandOption(
+          this._instance,
+          optionName,
+          optionObject,
+          preconditions,
+        ),
+      );
+    }
+
+    return options;
+  }
+
+  private registerRoot(command: Subcommand, filePath: string): void {
+    if (this._subCommands.has(command.commandName)) {
+      throw this.definitionError(
+        command.commandName,
+        `Subcommand root "${command.commandName}" is defined more than once.`,
+        filePath,
+      );
+    }
+    this._subCommands.set(command.commandName, command);
+
+    if (!supportsMessageCommands(command.commandObject.type)) {
+      return;
+    }
+
+    for (const name of [
+      command.commandName,
+      ...(command.commandObject.aliases ?? []),
+    ]) {
+      const normalizedName = this.normalizeName(
+        name,
+        command.commandName,
+        filePath,
+      );
+      if (this._legacyCommands.has(normalizedName)) {
+        throw this.definitionError(
           command.commandName,
-          description!,
-          optionDatas,
+          `Subcommand root name or alias "${normalizedName}" is defined more than once.`,
+          filePath,
         );
       }
+      this._legacyCommands.set(normalizedName, command);
     }
+
+    const legacyOptions = new Map<string, SubcommandOption>();
+    for (const option of command.options) {
+      for (const name of [
+        option.commandName,
+        ...(option.optionObject.aliases ?? []),
+      ]) {
+        legacyOptions.set(name.toLowerCase(), option);
+      }
+    }
+    this._legacyOptions.set(command, legacyOptions);
+  }
+
+  private validateRoot(
+    commandName: string,
+    definition: SubcommandObject,
+    filePath: string,
+  ): void {
+    if (!Object.values(CommandType).includes(definition?.type)) {
+      throw this.definitionError(
+        commandName,
+        "A subcommand root must define a valid CommandType.",
+        filePath,
+      );
+    }
+    if (supportsChatInputCommands(definition.type) && !definition.description) {
+      throw this.definitionError(
+        commandName,
+        "A slash-capable subcommand root must define a description.",
+        filePath,
+      );
+    }
+    this.validateSharedDefinition(commandName, definition, filePath);
+  }
+
+  private validateOption(
+    commandName: string,
+    optionName: string,
+    commandType: CommandType,
+    definition: SubcommandOptionObject,
+    filePath: string,
+  ): void {
+    if (typeof definition?.callback !== "function") {
+      throw this.definitionError(
+        commandName,
+        "A subcommand must define a callback function.",
+        filePath,
+        optionName,
+      );
+    }
+    if (supportsChatInputCommands(commandType) && !definition.description) {
+      throw this.definitionError(
+        commandName,
+        "A slash-capable subcommand must define a description.",
+        filePath,
+        optionName,
+      );
+    }
+    this.validateSharedDefinition(
+      commandName,
+      definition,
+      filePath,
+      optionName,
+    );
+  }
+
+  private validateSharedDefinition(
+    commandName: string,
+    definition: SubcommandObject | SubcommandOptionObject,
+    filePath: string,
+    optionName?: string,
+  ): void {
+    if (definition.init !== undefined && typeof definition.init !== "function") {
+      throw this.definitionError(
+        commandName,
+        "The init property must be a function.",
+        filePath,
+        optionName,
+      );
+    }
+    if (definition.reply !== undefined && typeof definition.reply !== "boolean") {
+      throw this.definitionError(
+        commandName,
+        "The reply property must be a boolean.",
+        filePath,
+        optionName,
+      );
+    }
+    if (!isValidDeferSetting(definition.deferReply)) {
+      throw this.definitionError(
+        commandName,
+        "The deferReply property must be a boolean or an options object with an optional boolean ephemeral property.",
+        filePath,
+        optionName,
+      );
+    }
+    if (
+      definition.aliases !== undefined &&
+      (!Array.isArray(definition.aliases) ||
+        definition.aliases.some(
+          (alias) => typeof alias !== "string" || alias.trim().length === 0,
+        ))
+    ) {
+      throw this.definitionError(
+        commandName,
+        "Aliases must be non-empty strings.",
+        filePath,
+        optionName,
+      );
+    }
+  }
+
+  private normalizeName(
+    name: string,
+    commandName: string,
+    filePath: string,
+    optionName?: string,
+  ): string {
+    const normalizedName = name.trim().toLowerCase();
+    if (!normalizedName || /\s/.test(normalizedName)) {
+      throw this.definitionError(
+        commandName,
+        "Legacy command names and aliases cannot be empty or contain whitespace.",
+        filePath,
+        optionName,
+      );
+    }
+    return normalizedName;
   }
 
   public async runCommand(
     command: SubcommandOption,
     args: string[],
-    interaction: CommandInteraction,
-  ): Promise<any> {
-    const { callback } = command.optionObject;
-
-    const guild = interaction.guild;
-    const member = interaction.member as GuildMember;
-    const user = interaction.user;
-    const channel = interaction.channel as TextChannel;
-
-    const usage: SubCommandUsage = {
-      client: command.instance.client,
-      instance: command.instance,
-      interaction,
+    message: Message | null,
+    interaction: ChatInputCommandInteraction | null,
+    selection: {
+      subcommandGroup?: string;
+      subcommandName?: string;
+    } = {},
+  ): Promise<void> {
+    await this._executor.executeSubcommand(
+      command,
       args,
-      text: args.join(" "),
-      guild,
-      member,
-      user: user!,
-      channel,
-    };
-
-    const prefix = await this._prefixes.get(guild?.id);
-
-    for (const validation of this._validations) {
-      if (!(await validation(command, usage, prefix))) {
-        return;
-      }
-    }
-
-    return await callback(usage);
+      message,
+      interaction,
+      selection,
+    );
   }
 
-  private getValidations(folder?: string) {
+  private getValidations(folder?: string): Array<(command: Subcommand | SubcommandOption) => void> {
     if (!folder) {
       return [];
     }
 
-    return getAllFiles(folder).map((fileData) => fileData.fileContents);
+    return getAllFiles(folder).map(({ fileContents, filePath }) => {
+      if (typeof fileContents !== "function") {
+        throw new TypeError(`Validation file "${filePath}" must export a function.`);
+      }
+      return fileContents as (command: Subcommand | SubcommandOption) => void;
+    });
+  }
+
+  private definitionError(
+    commandName: string,
+    message: string,
+    filePath: string,
+    subcommandName?: string,
+  ): CommandDefinitionError {
+    return new CommandDefinitionError(message, {
+      commandName,
+      filePath,
+      subcommandName,
+    });
   }
 }
 
-export default CommandHandler;
+function supportsMessageCommands(type: CommandType): boolean {
+  return type === CommandType.LEGACY || type === CommandType.BOTH;
+}
+
+function supportsChatInputCommands(type: CommandType): boolean {
+  return type === CommandType.SLASH || type === CommandType.BOTH;
+}
+
+function isValidDeferSetting(setting?: DeferSetting): boolean {
+  return (
+    setting === undefined ||
+    typeof setting === "boolean" ||
+    (typeof setting === "object" &&
+      setting !== null &&
+      (setting.ephemeral === undefined ||
+        typeof setting.ephemeral === "boolean"))
+  );
+}
+
+function getArgumentValues(
+  options:
+    | readonly {
+        value?: unknown;
+      }[]
+    | undefined,
+): string[] {
+  return (options ?? [])
+    .filter((option) => option.value !== undefined)
+    .map((option) => String(option.value));
+}
+
+export default SubcommandHandler;

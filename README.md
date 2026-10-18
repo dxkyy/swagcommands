@@ -2,14 +2,20 @@
 
 SWAGCommands is an easy-to-use Discord.JS command handler.
 
-![swagcommandsbanner](https://user-images.githubusercontent.com/76062903/212134943-9443c2d1-f46c-48c9-bfbf-896a1e77a06c.png)
+This is currently a "beta" v2 and not merged into the master branch, therefore also not yet published to npm.
+To use v2, clone the repo using `git clone -b v2 https://github.com/dxkyy/swagcommands`, then install and compile it:
+
+```bash
+pnpm install
+pnpm compile
+```
+
+To then use it cd into your project and run
+
+```bash
+pnpm link path-to-swagcommands
+```
 
 ## Documentation
 
-> coming soon
-
-## Todo
-
-- [ ] Documentation
-
-- [ ] ContextMenu Handler
+[Documentation](https://swag.arcs.top/)

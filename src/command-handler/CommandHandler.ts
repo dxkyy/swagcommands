@@ -1,56 +1,53 @@
 import {
   Client,
-  CommandInteraction,
-  GuildMember,
+  ChatInputCommandInteraction,
   Message,
-  TextChannel,
 } from "discord.js";
 import path from "path";
 
 import getAllFiles from "../util/get-all-files";
 import Command from "./Command";
-import SlashCommands from "./SlashCommands";
 import PrefixHandler from "./PrefixHandler";
-import CommandType from "../util/CommandType";
-import SWAG, { CommandObject, CommandUsage } from "../../typings";
+import type SWAG from "../SWAG";
+import type { CommandObject } from "../types";
+import CommandExecutor from "../execution/CommandExecutor";
+import { resolveCommandPreconditions } from "../preconditions/resolve-command-preconditions";
+import { compileCommandPreconditions } from "../preconditions/compile-command-preconditions";
 
 class CommandHandler {
   // <commandName, instance of the Command class>
   private _commands: Map<string, Command> = new Map();
-  private _validations = this.getValidations(
-    path.join(__dirname, "validations", "run-time"),
-  );
   private _instance: SWAG;
   private _client: Client;
   private _commandsDir: string;
-  private _slashCommands: SlashCommands;
   private _prefixes: PrefixHandler;
+  private _loading: Promise<void> | undefined;
+  private _executor: CommandExecutor;
 
-  constructor(instance: SWAG, commandsDir: string, client: Client) {
+  constructor(
+    instance: SWAG,
+    commandsDir: string,
+    client: Client,
+    executor: CommandExecutor,
+  ) {
     this._instance = instance;
     this._commandsDir = commandsDir;
-    this._slashCommands = new SlashCommands(client);
     this._client = client;
     this._prefixes = new PrefixHandler(instance);
-
-    this._validations = [
-      ...this._validations,
-      ...this.getValidations(instance.validations?.runtime),
-    ];
-
-    this.readFiles();
+    this._executor = executor;
   }
 
   public get commands() {
     return this._commands;
   }
 
-  public get slashCommands() {
-    return this._slashCommands;
-  }
-
   public get prefixHandler() {
     return this._prefixes;
+  }
+
+  public load(): Promise<void> {
+    this._loading ??= this.readFiles();
+    return this._loading;
   }
 
   private async readFiles() {
@@ -62,37 +59,29 @@ class CommandHandler {
 
     for (let fileData of [...files]) {
       const { filePath } = fileData;
-      const commandObject: CommandObject = fileData.fileContents;
+      const commandObject = fileData.fileContents as CommandObject;
 
       const split = filePath.split(/[\/\\]/);
       let commandName = split.pop()!;
       commandName = commandName.split(".")[0];
 
-      const command = new Command(this._instance, commandName, commandObject);
+      const preconditions = resolveCommandPreconditions(
+        this._instance.preconditions,
+        compileCommandPreconditions(commandObject),
+        {
+          commandName,
+          commandType: commandObject.type,
+          filePath,
+        },
+      );
+      const command = new Command(
+        this._instance,
+        commandName,
+        commandObject,
+        preconditions,
+      );
 
-      const {
-        description,
-        type,
-        testOnly,
-        delete: del,
-        aliases = [],
-        init = () => {},
-      } = commandObject;
-
-      // TODO: needs further inspection. removed disabledDefaultCommands check
-      if (del) {
-        if (type === "SLASH" || type === "BOTH") {
-          if (testOnly) {
-            for (const guildId of this._instance.testServers) {
-              this._slashCommands.delete(command.commandName, guildId);
-            }
-          } else {
-            this._slashCommands.delete(command.commandName);
-          }
-        }
-
-        continue;
-      }
+      const { aliases = [], init = () => {} } = commandObject;
 
       for (const validation of validations) {
         validation(command);
@@ -105,29 +94,6 @@ class CommandHandler {
       for (const name of names) {
         this._commands.set(name, command);
       }
-
-      if (type === "SLASH" || type === "BOTH") {
-        const options =
-          commandObject.options ||
-          this._slashCommands.createOptions(commandObject);
-
-        if (testOnly) {
-          for (const guildId of this._instance.testServers) {
-            this._slashCommands.create(
-              command.commandName,
-              description!,
-              options,
-              guildId,
-            );
-          }
-        } else {
-          this._slashCommands.create(
-            command.commandName,
-            description!,
-            options,
-          );
-        }
-      }
     }
   }
 
@@ -135,52 +101,22 @@ class CommandHandler {
     command: Command,
     args: string[],
     message: Message | null,
-    interaction: CommandInteraction | null,
-  ) {
-    const { callback, type } = command.commandObject;
-
-    if (message && type === CommandType.SLASH) {
-      return;
-    }
-
-    const guild = message ? message.guild : interaction?.guild;
-    const member = (
-      message ? message.member : interaction?.member
-    ) as GuildMember;
-    const user = message ? message.author : interaction?.user;
-    const channel = (
-      message ? message.channel : interaction?.channel
-    ) as TextChannel;
-
-    const usage: CommandUsage = {
-      client: command.instance.client,
-      instance: command.instance,
-      message,
-      interaction,
-      args,
-      text: args.join(" "),
-      guild,
-      member,
-      user: user!,
-      channel,
-    };
-
-    const prefix = await this._prefixes.get(guild?.id);
-    for (const validation of this._validations) {
-      if (!(await validation(command, usage, prefix))) {
-        return;
-      }
-    }
-
-    return await callback(usage);
+    interaction: ChatInputCommandInteraction | null,
+  ): Promise<void> {
+    await this._executor.executeCommand(command, args, message, interaction);
   }
 
-  private getValidations(folder?: string) {
+  private getValidations(folder?: string): Array<(command: Command) => void> {
     if (!folder) {
       return [];
     }
 
-    return getAllFiles(folder).map((fileData) => fileData.fileContents);
+    return getAllFiles(folder).map(({ fileContents, filePath }) => {
+      if (typeof fileContents !== "function") {
+        throw new TypeError(`Validation file "${filePath}" must export a function.`);
+      }
+      return fileContents as (command: Command) => void;
+    });
   }
 }
 
